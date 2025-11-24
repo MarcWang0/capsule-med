@@ -68,7 +68,7 @@ const App: React.FC = () => {
                 onClick={toggleFocusMode}
                 className="hidden md:flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-xs md:text-sm font-medium hover:bg-slate-800 transition-all shadow-md active:scale-95"
             >
-                <Maximize2 size={16} /> <span className="hidden lg:inline">Mode Anti-Scroll</span>
+                <Maximize2 size={16} /> <span className="hidden lg:inline">Mode Focus</span>
             </button>
           </div>
         </header>
@@ -150,7 +150,7 @@ const App: React.FC = () => {
                             </div>
                             <h3 className="text-xl font-bold text-slate-900 mb-3">Productivité Intégrée</h3>
                             <p className="text-slate-500 leading-relaxed">
-                                Alternez travail intense et pauses avec le Pomodoro. Activez l'Anti-Scroll pour éliminer toute distraction.
+                                Alternez travail intense et pauses avec le Pomodoro. Activez le Mode Focus pour éliminer toute distraction.
                             </p>
                         </div>
                     </div>
@@ -253,9 +253,10 @@ const App: React.FC = () => {
                 {viewMode === ViewMode.FOCUS && (
                     <button 
                         onClick={toggleFocusMode}
-                        className="absolute top-6 right-6 z-50 p-3 bg-white/10 text-white hover:bg-white/20 backdrop-blur-md rounded-full transition-all"
+                        className="absolute top-6 right-6 z-50 px-4 py-2 bg-white/10 text-white hover:bg-white/20 backdrop-blur-md rounded-full transition-all flex items-center gap-2 font-medium border border-white/10 group"
                     >
-                        <Minimize2 size={24} />
+                        <Minimize2 size={18} />
+                        <span>Quitter le mode Focus</span>
                     </button>
                 )}
 

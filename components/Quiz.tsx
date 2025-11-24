@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { QuizData, QuizOption } from '../types';
-import { CheckCircle2, XCircle, ArrowRight, RotateCcw, HelpCircle, Trophy } from 'lucide-react';
+import { CheckCircle2, XCircle, ArrowRight, RotateCcw, HelpCircle, Trophy, PlayCircle, BrainCircuit } from 'lucide-react';
 
 interface QuizProps {
   quizData: QuizData | undefined;
@@ -8,6 +8,7 @@ interface QuizProps {
 }
 
 const Quiz: React.FC<QuizProps> = ({ quizData, onComplete }) => {
+  const [hasStarted, setHasStarted] = useState(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedOptions, setSelectedOptions] = useState<number[]>([]);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -16,6 +17,7 @@ const Quiz: React.FC<QuizProps> = ({ quizData, onComplete }) => {
 
   // Reset state when quizData changes (new video selected)
   useEffect(() => {
+    setHasStarted(false);
     setCurrentQuestionIndex(0);
     setSelectedOptions([]);
     setIsSubmitted(false);
@@ -30,10 +32,12 @@ const Quiz: React.FC<QuizProps> = ({ quizData, onComplete }) => {
   const currentQuestion = quizData.questions[currentQuestionIndex];
   const totalQuestions = quizData.questions.length;
 
+  const handleStart = () => {
+    setHasStarted(true);
+  };
+
   const handleOptionClick = (optionId: number) => {
     if (isSubmitted) return;
-    // Pour un QCM à choix unique (radio behavior), on remplace la sélection
-    // Si vous voulez du choix multiple, changez la logique ici.
     setSelectedOptions([optionId]); 
   };
 
@@ -42,7 +46,6 @@ const Quiz: React.FC<QuizProps> = ({ quizData, onComplete }) => {
     
     setIsSubmitted(true);
     
-    // Check if correct (assuming single choice for simplified logic, adaptable for multi)
     const selectedOptionId = selectedOptions[0];
     const correctOption = currentQuestion.options.find(o => o.isCorrect);
     
@@ -63,6 +66,7 @@ const Quiz: React.FC<QuizProps> = ({ quizData, onComplete }) => {
   };
 
   const handleRetry = () => {
+    setHasStarted(false);
     setCurrentQuestionIndex(0);
     setSelectedOptions([]);
     setIsSubmitted(false);
@@ -70,9 +74,39 @@ const Quiz: React.FC<QuizProps> = ({ quizData, onComplete }) => {
     setShowResult(false);
   };
 
+  // --- SCREEN 1: START SCREEN ---
+  if (!hasStarted) {
+    return (
+        <div className="bg-gradient-to-br from-indigo-600 to-violet-700 rounded-xl border border-indigo-500 shadow-md mt-6 p-8 text-white relative overflow-hidden">
+            {/* Background decoration */}
+            <div className="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-white/10 rounded-full blur-2xl"></div>
+            <div className="absolute bottom-0 left-0 -mb-10 -ml-10 w-40 h-40 bg-black/10 rounded-full blur-2xl"></div>
+
+            <div className="relative z-10 flex flex-col items-center text-center">
+                <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mb-6 shadow-inner">
+                    <BrainCircuit size={32} className="text-white" />
+                </div>
+                
+                <h3 className="text-2xl font-bold mb-2">Testez vos connaissances</h3>
+                <p className="text-indigo-100 mb-8 max-w-md">
+                    Ce quiz contient {totalQuestions} questions pour valider votre compréhension de la capsule. Prêt à relever le défi ?
+                </p>
+
+                <button 
+                    onClick={handleStart}
+                    className="group px-8 py-3 bg-white text-indigo-700 rounded-xl font-bold text-lg hover:bg-indigo-50 transition-all shadow-lg active:scale-95 flex items-center gap-2"
+                >
+                    Lancer le Quiz <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                </button>
+            </div>
+        </div>
+    );
+  }
+
+  // --- SCREEN 3: RESULTS ---
   if (showResult) {
     return (
-      <div className="bg-white rounded-xl border border-slate-200 p-8 text-center shadow-sm mt-6">
+      <div className="bg-white rounded-xl border border-slate-200 p-8 text-center shadow-sm mt-6 animate-in fade-in zoom-in-95 duration-300">
         <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4 text-yellow-600">
           <Trophy size={32} />
         </div>
@@ -93,8 +127,9 @@ const Quiz: React.FC<QuizProps> = ({ quizData, onComplete }) => {
     );
   }
 
+  // --- SCREEN 2: QUESTIONS ---
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mt-6">
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mt-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Header */}
       <div className="bg-indigo-50/50 border-b border-indigo-100 p-4 flex justify-between items-center">
         <div className="flex items-center gap-2 text-indigo-800 font-semibold">
