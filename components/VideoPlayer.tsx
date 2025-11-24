@@ -1,6 +1,6 @@
 import React from 'react';
 import { Capsule } from '../types';
-import { PlayCircle } from 'lucide-react';
+import { PlayCircle, Clock } from 'lucide-react';
 
 interface VideoPlayerProps {
   capsule: Capsule | null;
@@ -16,34 +16,59 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ capsule }) => {
     );
   }
 
-  // Determine if it's a direct file or an embed needed (simplified logic)
-  const isDirectFile = capsule.videoUrl?.endsWith('.mp4');
+  // Robust URL parser
+  const getEmbedUrl = (url: string) => {
+    if (!url) return '';
+    
+    // If it's already an embed link (like from the iframe src), use it directly
+    if (url.includes('youtube.com/embed/')) {
+        return url;
+    }
+
+    // Handle youtu.be/ID
+    if (url.includes('youtu.be/')) {
+        return url.replace('youtu.be/', 'www.youtube.com/embed/');
+    }
+    
+    // Handle youtube.com/watch?v=ID
+    if (url.includes('youtube.com/watch?v=')) {
+        return url.replace('watch?v=', 'embed/');
+    }
+
+    return url;
+  };
+
+  const finalVideoUrl = capsule.videoUrl ? getEmbedUrl(capsule.videoUrl) : undefined;
+  const isDirectFile = finalVideoUrl?.endsWith('.mp4');
 
   return (
     <div className="flex flex-col gap-4">
       <div className="relative w-full aspect-video bg-black rounded-xl overflow-hidden shadow-lg ring-1 ring-black/10">
-        {capsule.videoUrl ? (
+        {finalVideoUrl ? (
           isDirectFile ? (
             <video
-              src={capsule.videoUrl}
+              src={finalVideoUrl}
               controls
               className="w-full h-full object-contain"
               autoPlay={false}
             />
           ) : (
             <iframe
-              src={capsule.videoUrl} // Assuming user puts embeddable URLs
+              src={finalVideoUrl}
               className="w-full h-full"
+              title={capsule.title}
               frameBorder="0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              referrerPolicy="strict-origin-when-cross-origin"
               allowFullScreen
             ></iframe>
           )
         ) : (
-          <div className="w-full h-full flex items-center justify-center bg-slate-800 text-white flex-col p-8 text-center">
-            <p className="text-xl font-semibold mb-2">Vidéo non hébergée</p>
-            <p className="text-slate-400 text-sm max-w-md">
-              Pour voir cette vidéo, vous devez ajouter l'URL de votre hébergeur (Vimeo, YouTube, S3) dans le fichier <code>services/courseData.ts</code>.
+          <div className="w-full h-full flex items-center justify-center bg-slate-50 flex-col p-8 text-center border border-slate-200">
+            <Clock size={48} className="text-slate-400 mb-4" />
+            <p className="text-xl font-bold text-slate-700 mb-2">Bientôt disponible</p>
+            <p className="text-slate-500 text-sm max-w-md">
+              Cette capsule de cours est en cours de préparation. Revenez très vite !
             </p>
           </div>
         )}

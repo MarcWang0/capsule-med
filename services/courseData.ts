@@ -2,10 +2,15 @@ import { Capsule, SubjectGroup } from '../types';
 
 // This is where you will add your video URLs.
 // I have populated it with your CSV data.
-// For the demo, I added a placeholder video URL.
 
 const rawData = [
-  { id: 1, title: "Introduction à la cellule et ses types (procaryotes/eucaryotes)", subject: "Biologie", theme: "Biologie cellulaire et moléculaire" },
+  { 
+    id: 1, 
+    title: "Introduction à la cellule et ses types (procaryotes/eucaryotes)", 
+    subject: "Biologie", 
+    theme: "Biologie cellulaire et moléculaire",
+    videoUrl: "https://www.youtube.com/embed/XVvUyPkC3kc?si=WYVA-lRSZVLwtbr6" // Updated to full Embed URL
+  },
   { id: 2, title: "La membrane plasmique : structure et rôle", subject: "Biologie", theme: "Biologie cellulaire et moléculaire" },
   { id: 3, title: "Les organites : mitochondries et production d’énergie", subject: "Biologie", theme: "Biologie cellulaire et moléculaire" },
   { id: 4, title: "Noyau et organisation de l’ADN", subject: "Biologie", theme: "Biologie cellulaire et moléculaire" },
@@ -129,12 +134,9 @@ export const getCourseData = (): SubjectGroup[] => {
     if (!subjects[item.subject][item.theme]) {
       subjects[item.subject][item.theme] = [];
     }
-    // Add default video URL if none provided
-    const videoUrl = item.id === 1 
-      ? "https://www.w3schools.com/html/mov_bbb.mp4" // Example placeholder
-      : undefined;
-
-    subjects[item.subject][item.theme].push({ ...item, videoUrl });
+    
+    // Pass the item directly, including videoUrl if it exists
+    subjects[item.subject][item.theme].push(item);
   });
 
   return Object.keys(subjects).map(subjectName => ({
@@ -147,5 +149,5 @@ export const getCourseData = (): SubjectGroup[] => {
 };
 
 export const getAllCapsules = (): Capsule[] => {
-    return rawData.map(c => ({...c, videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4"}));
+    return rawData;
 }

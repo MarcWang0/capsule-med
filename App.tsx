@@ -5,9 +5,9 @@ import Sidebar from './components/Sidebar';
 import VideoPlayer from './components/VideoPlayer';
 import Pomodoro from './components/Pomodoro';
 import ChatAssistant from './components/ChatAssistant';
-import { Maximize2, Minimize2, GraduationCap, Timer, MessageCircle, PlayCircle, Menu, X } from 'lucide-react';
+import { Maximize2, Minimize2, GraduationCap, Timer, MessageCircle, PlayCircle, Menu, X, ArrowRight, BookOpen } from 'lucide-react';
 
-type Tab = 'courses' | 'pomodoro' | 'chat';
+type Tab = 'home' | 'courses' | 'pomodoro' | 'chat';
 
 const App: React.FC = () => {
   const courseData = getCourseData();
@@ -16,11 +16,15 @@ const App: React.FC = () => {
   // State
   const [currentCapsule, setCurrentCapsule] = useState<Capsule | null>(allCapsules[0] || null);
   const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.DEFAULT);
-  const [activeTab, setActiveTab] = useState<Tab>('courses');
+  const [activeTab, setActiveTab] = useState<Tab>('home');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const toggleFocusMode = () => {
     setViewMode(prev => prev === ViewMode.DEFAULT ? ViewMode.FOCUS : ViewMode.DEFAULT);
+  };
+
+  const startLearning = () => {
+    setActiveTab('courses');
   };
 
   return (
@@ -29,15 +33,15 @@ const App: React.FC = () => {
       {/* --- HEADER (Desktop & Mobile) --- */}
       {viewMode === ViewMode.DEFAULT && (
         <header className="h-14 md:h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 md:px-6 shrink-0 z-20 shadow-sm relative">
-          <div className="flex items-center gap-3">
+          <button onClick={() => setActiveTab('home')} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
             <div className="bg-indigo-600 p-1.5 md:p-2 rounded-lg text-white">
                 <GraduationCap size={20} className="md:w-6 md:h-6" />
             </div>
-            <div>
+            <div className="text-left">
                 <h1 className="font-bold text-lg md:text-xl text-slate-900 tracking-tight leading-tight">Capsule Med</h1>
                 <p className="hidden md:block text-xs text-slate-500 font-medium">Plateforme de Révision PASS/LAS</p>
             </div>
-          </div>
+          </button>
           
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center bg-slate-100 p-1 rounded-lg">
@@ -69,6 +73,60 @@ const App: React.FC = () => {
       {/* --- MAIN CONTENT --- */}
       <main className="flex-1 flex overflow-hidden relative">
         
+        {/* VIEW: HOME */}
+        <div className={`flex-1 w-full h-full overflow-y-auto bg-white ${activeTab === 'home' ? 'block' : 'hidden'}`}>
+             <div className="max-w-4xl mx-auto px-6 py-12 md:py-20 flex flex-col items-center text-center">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-sm font-medium mb-6">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                    </span>
+                    Nouvelle formation PASS/LAS disponible
+                </div>
+                <h1 className="text-4xl md:text-6xl font-bold text-slate-900 mb-6 tracking-tight">
+                    Réussir sa <span className="text-indigo-600">Médecine</span> <br/> une capsule à la fois.
+                </h1>
+                <p className="text-lg text-slate-600 mb-10 max-w-2xl leading-relaxed">
+                    Accédez à plus de 100 capsules de cours structurées, optimisées pour la mémorisation. 
+                    Utilisez le Pomodoro intégré et l'assistant IA pour maximiser votre efficacité.
+                </p>
+                
+                <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+                    <button 
+                        onClick={startLearning}
+                        className="px-8 py-4 bg-indigo-600 text-white rounded-xl font-bold text-lg hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 flex items-center justify-center gap-2"
+                    >
+                        Commencer les cours <ArrowRight size={20} />
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('pomodoro')}
+                        className="px-8 py-4 bg-white text-slate-700 border border-slate-200 rounded-xl font-bold text-lg hover:bg-slate-50 transition-all flex items-center justify-center gap-2"
+                    >
+                        <Timer size={20} /> Mode Pomodoro
+                    </button>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mt-20 w-full border-t border-slate-100 pt-12">
+                    <div>
+                        <div className="text-3xl font-bold text-slate-900 mb-1">112</div>
+                        <div className="text-sm text-slate-500 font-medium uppercase tracking-wide">Capsules</div>
+                    </div>
+                    <div>
+                        <div className="text-3xl font-bold text-slate-900 mb-1">3</div>
+                        <div className="text-sm text-slate-500 font-medium uppercase tracking-wide">Matières</div>
+                    </div>
+                    <div>
+                        <div className="text-3xl font-bold text-slate-900 mb-1">IA</div>
+                        <div className="text-sm text-slate-500 font-medium uppercase tracking-wide">Tuteur 24/7</div>
+                    </div>
+                    <div>
+                        <div className="text-3xl font-bold text-slate-900 mb-1">100%</div>
+                        <div className="text-sm text-slate-500 font-medium uppercase tracking-wide">Gratuit</div>
+                    </div>
+                </div>
+             </div>
+        </div>
+
         {/* VIEW: COURSES */}
         <div className={`flex-1 flex w-full h-full ${activeTab === 'courses' ? 'flex' : 'hidden'}`}>
             
@@ -165,6 +223,13 @@ const App: React.FC = () => {
       {/* --- MOBILE BOTTOM NAVIGATION --- */}
       {viewMode === ViewMode.DEFAULT && (
           <nav className="md:hidden h-16 bg-white border-t border-slate-200 flex justify-around items-center shrink-0 pb-safe z-50">
+             <button 
+                onClick={() => setActiveTab('home')}
+                className={`flex flex-col items-center gap-1 p-2 w-full ${activeTab === 'home' ? 'text-indigo-600' : 'text-slate-400'}`}
+            >
+                <BookOpen size={24} className={activeTab === 'home' ? 'fill-indigo-100' : ''} />
+                <span className="text-[10px] font-medium">Accueil</span>
+            </button>
             <button 
                 onClick={() => setActiveTab('courses')}
                 className={`flex flex-col items-center gap-1 p-2 w-full ${activeTab === 'courses' ? 'text-indigo-600' : 'text-slate-400'}`}
