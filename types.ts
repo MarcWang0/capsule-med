@@ -27,3 +27,23 @@ export enum TimerMode {
   WORK = 'WORK',
   BREAK = 'BREAK',
 }
+
+// --- Types pour le Quiz ---
+
+export interface QuizOption {
+  id: number;
+  text: string;
+  isCorrect: boolean;
+}
+
+export interface QuizQuestion {
+  id: number;
+  question: string;
+  options: QuizOption[];
+  explanation: string; // Le texte affiché lors de la correction
+}
+
+export interface QuizData {
+  capsuleId: number;
+  questions: QuizQuestion[];
+}

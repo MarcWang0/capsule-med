@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { getCourseData, getAllCapsules } from './services/courseData';
+import { getQuizByCapsuleId } from './services/quizData';
 import { Capsule, ViewMode } from './types';
 import Sidebar from './components/Sidebar';
 import VideoPlayer from './components/VideoPlayer';
 import Pomodoro from './components/Pomodoro';
 import ChatAssistant from './components/ChatAssistant';
+import Quiz from './components/Quiz';
 import { Maximize2, Minimize2, GraduationCap, Timer, MessageCircle, PlayCircle, Menu, X, ArrowRight, BookOpen, Brain, Zap, CheckCircle2 } from 'lucide-react';
 
 type Tab = 'home' | 'courses' | 'pomodoro' | 'chat';
@@ -26,6 +28,8 @@ const App: React.FC = () => {
   const startLearning = () => {
     setActiveTab('courses');
   };
+  
+  const currentQuiz = currentCapsule ? getQuizByCapsuleId(currentCapsule.id) : undefined;
 
   return (
     <div className="h-screen w-screen flex flex-col overflow-hidden bg-slate-50 font-sans text-slate-900">
@@ -255,8 +259,13 @@ const App: React.FC = () => {
                     </button>
                 )}
 
-                <div className={`flex-1 ${viewMode === ViewMode.FOCUS ? 'flex items-center justify-center w-full h-full bg-black' : 'p-4 md:p-6 max-w-5xl mx-auto w-full'}`}>
+                <div className={`flex-1 flex flex-col ${viewMode === ViewMode.FOCUS ? 'items-center justify-center w-full h-full bg-black' : 'p-4 md:p-6 max-w-5xl mx-auto w-full'}`}>
                     <VideoPlayer capsule={currentCapsule} />
+                    
+                    {/* Integrate Quiz Below Video (Only in Default Mode) */}
+                    {viewMode === ViewMode.DEFAULT && currentCapsule && (
+                        <Quiz quizData={currentQuiz} />
+                    )}
                 </div>
             </section>
 
