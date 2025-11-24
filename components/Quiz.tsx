@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { QuizData, QuizOption } from '../types';
-import { CheckCircle2, XCircle, ArrowRight, RotateCcw, HelpCircle, Trophy, PlayCircle, BrainCircuit } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { CheckCircle2, XCircle, ArrowRight, RotateCcw, HelpCircle, Trophy, BrainCircuit, Lock } from 'lucide-react';
 
 interface QuizProps {
   quizData: QuizData | undefined;
@@ -8,6 +9,7 @@ interface QuizProps {
 }
 
 const Quiz: React.FC<QuizProps> = ({ quizData, onComplete }) => {
+  const { user, markCapsuleAsCompleted } = useAuth();
   const [hasStarted, setHasStarted] = useState(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedOptions, setSelectedOptions] = useState<number[]>([]);
@@ -24,6 +26,14 @@ const Quiz: React.FC<QuizProps> = ({ quizData, onComplete }) => {
     setScore(0);
     setShowResult(false);
   }, [quizData]);
+
+  const handleCompletion = () => {
+    // Si l'utilisateur est connecté et que le quiz est fini, on valide
+    // (Dans un vrai cas on vérifierait peut-être un score > 50%)
+    if (user && quizData) {
+        markCapsuleAsCompleted(quizData.capsuleId);
+    }
+  };
 
   if (!quizData || quizData.questions.length === 0) {
     return null; 
@@ -61,6 +71,7 @@ const Quiz: React.FC<QuizProps> = ({ quizData, onComplete }) => {
       setIsSubmitted(false);
     } else {
       setShowResult(true);
+      handleCompletion();
       if (onComplete) onComplete();
     }
   };
@@ -89,7 +100,8 @@ const Quiz: React.FC<QuizProps> = ({ quizData, onComplete }) => {
                 
                 <h3 className="text-2xl font-bold mb-2">Testez vos connaissances</h3>
                 <p className="text-indigo-100 mb-8 max-w-md">
-                    Ce quiz contient {totalQuestions} questions pour valider votre compréhension de la capsule. Prêt à relever le défi ?
+                    Ce quiz contient {totalQuestions} questions pour valider votre compréhension de la capsule.
+                    {!user && <span className="block mt-2 text-yellow-200 text-sm font-semibold flex items-center justify-center gap-1"><Lock size={12}/> Connectez-vous pour sauvegarder votre progression !</span>}
                 </p>
 
                 <button 
@@ -115,6 +127,16 @@ const Quiz: React.FC<QuizProps> = ({ quizData, onComplete }) => {
             Votre score : <span className="font-bold text-indigo-600 text-xl">{score} / {totalQuestions}</span>
         </p>
         
+        {user ? (
+             <div className="mb-6 p-3 bg-emerald-50 text-emerald-700 rounded-lg text-sm flex items-center justify-center gap-2 font-medium">
+                 <CheckCircle2 size={16}/> Capsule validée et ajoutée à votre profil !
+             </div>
+        ) : (
+             <div className="mb-6 p-3 bg-slate-50 text-slate-500 rounded-lg text-sm">
+                 Connectez-vous pour valider cette capsule définitivement.
+             </div>
+        )}
+
         <div className="flex justify-center gap-4">
              <button 
                 onClick={handleRetry}
@@ -154,11 +176,11 @@ const Quiz: React.FC<QuizProps> = ({ quizData, onComplete }) => {
             
             if (isSubmitted) {
               if (option.isCorrect) {
-                itemClass += "border-emerald-500 bg-emerald-50 text-emerald-800"; // Correct answer styling
+                itemClass += "border-emerald-500 bg-emerald-50 text-emerald-800";
               } else if (isSelected && !option.isCorrect) {
-                itemClass += "border-red-500 bg-red-50 text-red-800"; // Wrong selection styling
+                itemClass += "border-red-500 bg-red-50 text-red-800";
               } else {
-                itemClass += "border-slate-100 text-slate-400 opacity-60"; // Other non-selected options
+                itemClass += "border-slate-100 text-slate-400 opacity-60";
               }
             } else {
               if (isSelected) {

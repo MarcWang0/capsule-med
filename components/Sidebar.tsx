@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Capsule, SubjectGroup } from '../types';
-import { ChevronDown, ChevronRight, Play, BookOpen } from 'lucide-react';
+import { ChevronDown, ChevronRight, Play, BookOpen, CheckCircle2 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 interface SidebarProps {
   courseData: SubjectGroup[];
@@ -9,6 +10,7 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ courseData, currentCapsule, onSelectCapsule }) => {
+  const { user } = useAuth();
   const [expandedSubjects, setExpandedSubjects] = useState<string[]>(courseData.map(s => s.name)); // All open by default
   const [expandedThemes, setExpandedThemes] = useState<string[]>([]);
 
@@ -24,15 +26,27 @@ const Sidebar: React.FC<SidebarProps> = ({ courseData, currentCapsule, onSelectC
     );
   };
 
+  const isCompleted = (capsuleId: number) => {
+    return user?.completedCapsules.includes(capsuleId);
+  };
+
   return (
     <div className="h-full flex flex-col bg-white">
-      {/* Header hidden on mobile if parent handles it, but kept for desktop consistency */}
+      {/* Header */}
       <div className="hidden md:block p-4 border-b border-slate-100 bg-slate-50 shrink-0">
         <h2 className="font-bold text-slate-800 text-lg flex items-center gap-2">
             <BookOpen className="text-indigo-600" size={20}/>
             Programme
         </h2>
-        <p className="text-xs text-slate-500 mt-1">{courseData.reduce((acc, sub) => acc + sub.themes.reduce((tAcc, t) => tAcc + t.capsules.length, 0), 0)} Capsules disponibles</p>
+        <div className="flex items-center justify-between mt-1">
+            <p className="text-xs text-slate-500">{courseData.reduce((acc, sub) => acc + sub.themes.reduce((tAcc, t) => tAcc + t.capsules.length, 0), 0)} Capsules</p>
+            {user && (
+                <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <CheckCircle2 size={10} />
+                    {user.completedCapsules.length} Validées
+                </span>
+            )}
+        </div>
       </div>
       
       <div className="flex-1 overflow-y-auto p-2 pb-20 md:pb-2">
@@ -72,14 +86,19 @@ const Sidebar: React.FC<SidebarProps> = ({ courseData, currentCapsule, onSelectC
                           <button
                             key={capsule.id}
                             onClick={() => onSelectCapsule(capsule)}
-                            className={`w-full text-left p-3 md:p-2 rounded text-xs flex items-start gap-2 transition-all ${
+                            className={`w-full text-left p-3 md:p-2 rounded text-xs flex items-center justify-between gap-2 transition-all ${
                               currentCapsule?.id === capsule.id
                                 ? 'bg-indigo-50 text-indigo-700 font-semibold border-r-2 border-indigo-600'
                                 : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
                             }`}
                           >
-                            <Play size={12} className={`mt-0.5 shrink-0 ${currentCapsule?.id === capsule.id ? 'fill-indigo-700' : ''}`} />
-                            <span className="line-clamp-2">{capsule.title}</span>
+                            <div className="flex items-start gap-2">
+                                <Play size={12} className={`mt-0.5 shrink-0 ${currentCapsule?.id === capsule.id ? 'fill-indigo-700' : ''}`} />
+                                <span className="line-clamp-2">{capsule.title}</span>
+                            </div>
+                            {isCompleted(capsule.id) && (
+                                <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />
+                            )}
                           </button>
                         ))}
                       </div>
