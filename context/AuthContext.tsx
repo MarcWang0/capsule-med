@@ -84,13 +84,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                      displayName: firebaseUser.displayName,
                      completedCapsules: []
                    };
-                   // On ne bloque pas l'UI si l'écriture échoue
-                   await setDoc(docRef, { completedCapsules: [], email: firebaseUser.email, displayName: firebaseUser.displayName });
+                   // On utilise setDoc avec merge pour être sûr
+                   await setDoc(docRef, { 
+                       completedCapsules: [], 
+                       email: firebaseUser.email, 
+                       displayName: firebaseUser.displayName 
+                   }, { merge: true });
+                   
                    setUser(newUser);
                 }
             } catch (e) {
-                console.error("Erreur Firestore:", e);
-                // Fallback UI minimal en cas d'erreur DB
+                console.error("Erreur lecture Firestore:", e);
+                // Fallback UI minimal en cas d'erreur DB (ex: droits d'accès)
                 setUser({ 
                     uid: firebaseUser.uid,
                     email: firebaseUser.email,
@@ -159,7 +164,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (auth) {
       const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
-      // La logique onAuthStateChanged gérera la création du user Firestore
+      // La logique onAuthStateChanged s'occupera de récupérer/créer le user Firestore
     } else {
       // Simulation Google
       await new Promise(r => setTimeout(r, 800));
@@ -184,26 +189,32 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const markCapsuleAsCompleted = async (capsuleId: number) => {
     if (!user) return;
     
-    // Éviter les doublons localement pour réactivité immédiate
+    // Éviter les doublons
     if (user.completedCapsules.includes(capsuleId)) return;
+    
     const newCompleted = [...user.completedCapsules, capsuleId];
+
+    // 1. Mise à jour Optimiste (Immédiate) de l'UI
+    // On met à jour l'état local TOUT DE SUITE pour que l'utilisateur voie la coche verte
+    // sans attendre la réponse du serveur.
+    setUser({ ...user, completedCapsules: newCompleted });
 
     if (auth && db) {
       try {
-          // Update Firebase
           const userRef = doc(db, 'users', user.uid);
-          await updateDoc(userRef, {
+          // 2. Sauvegarde en arrière-plan
+          // Utilisation de setDoc avec merge:true au lieu de updateDoc.
+          // C'est plus robuste : si le document n'existait pas, il sera créé.
+          await setDoc(userRef, {
             completedCapsules: arrayUnion(capsuleId)
-          });
-          // Update local state
-          setUser({ ...user, completedCapsules: newCompleted });
+          }, { merge: true });
       } catch (e) {
-          console.error("Erreur sauvegarde progression", e);
+          console.error("Erreur sauvegarde Firebase:", e);
+          console.warn("Vérifiez l'onglet 'Règles' dans Firestore Database si l'écriture échoue constamment.");
       }
     } else {
-      // Update Local
-      const updatedUser = { ...user, completedCapsules: newCompleted };
-      saveLocalUser(updatedUser);
+      // Update Local (Mode Simulation)
+      saveLocalUser({ ...user, completedCapsules: newCompleted });
     }
   };
 
