@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Capsule } from '../types';
 import { GoogleGenAI } from "@google/genai";
 import { Send, Bot, Loader2, AlertCircle, X } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 
 interface ChatAssistantProps {
   currentCapsule: Capsule | null;
@@ -21,8 +22,8 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ currentCapsule, onClose }
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Accès standard à la clé API (nécessite les types "vite/client" dans tsconfig.json)
-  const apiKey = import.meta.env.VITE_API_KEY;
+  // Use process.env.API_KEY as per Google GenAI guidelines
+  const apiKey = process.env.API_KEY;
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -35,7 +36,7 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ currentCapsule, onClose }
   // Reset chat when video changes
   useEffect(() => {
     if (currentCapsule) {
-        setMessages([{ role: 'model', text: `Nous regardons "${currentCapsule.title}". Une question sur ce sujet ?` }]);
+        setMessages([{ role: 'model', text: `Nous regardons **"${currentCapsule.title}"**. Une question sur ce sujet ?` }]);
     }
   }, [currentCapsule]);
 
@@ -45,7 +46,7 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ currentCapsule, onClose }
     // Check for API Key validity gracefully
     if (!apiKey) {
          setMessages(prev => [...prev, { role: 'user', text: input }]);
-         setMessages(prev => [...prev, { role: 'model', text: "Erreur configuration : Clé API manquante. Ajoutez VITE_API_KEY dans Vercel." }]);
+         setMessages(prev => [...prev, { role: 'model', text: "Erreur configuration : Clé API manquante. Ajoutez API_KEY dans les variables d'environnement." }]);
          setInput('');
         return;
     }
@@ -56,7 +57,7 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ currentCapsule, onClose }
     setIsLoading(true);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: apiKey });
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       
       const context = `
         Tu es un tuteur médical expert pour l'application "Capsule Med".
@@ -69,6 +70,7 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ currentCapsule, onClose }
         2. Si la question porte sur le cours, donne une explication claire adaptée à un étudiant de première année de médecine (PASS/LAS).
         3. Si la question n'a rien à voir avec la médecine ou le cours, ramène gentiment le sujet au cours.
         4. Sois bienveillant et motivant.
+        5. Utilise le Markdown pour structurer ta réponse (gras pour les mots clés, listes à puces pour les étapes).
       `;
 
       const response = await ai.models.generateContent({
@@ -133,7 +135,19 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ currentCapsule, onClose }
                   : 'bg-white border border-slate-200 text-slate-800 rounded-bl-sm shadow-sm'
               }`}
             >
-              {msg.text}
+              <ReactMarkdown
+                components={{
+                  // Personnalisation des éléments Markdown pour s'adapter au style du chat
+                  p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} />,
+                  ul: ({node, ...props}) => <ul className="list-disc pl-4 mb-2 space-y-1" {...props} />,
+                  ol: ({node, ...props}) => <ol className="list-decimal pl-4 mb-2 space-y-1" {...props} />,
+                  li: ({node, ...props}) => <li className="pl-1" {...props} />,
+                  strong: ({node, ...props}) => <span className="font-bold" {...props} />,
+                  a: ({node, ...props}) => <a className="underline hover:opacity-80" target="_blank" rel="noopener noreferrer" {...props} />
+                }}
+              >
+                {msg.text}
+              </ReactMarkdown>
             </div>
           </div>
         ))}
@@ -168,7 +182,7 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ currentCapsule, onClose }
         </div>
         {!apiKey && (
              <div className="mt-2 text-[10px] text-red-500 flex items-center justify-center gap-1">
-                 <AlertCircle size={10} /> Clé API manquante (Vercel)
+                 <AlertCircle size={10} /> Clé API manquante
              </div>
         )}
       </div>
