@@ -9,7 +9,7 @@ import ChatAssistant from './components/ChatAssistant';
 import Quiz from './components/Quiz';
 import AuthModal from './components/AuthModal';
 import { useAuth } from './context/AuthContext';
-import { Maximize2, Minimize2, GraduationCap, Timer, MessageCircle, PlayCircle, Menu, X, ArrowRight, BookOpen, Brain, Zap, CheckCircle2, User, LogOut, LogIn } from 'lucide-react';
+import { Maximize2, Minimize2, GraduationCap, Timer, MessageCircle, PlayCircle, Menu, X, ArrowRight, BookOpen, Brain, Zap, CheckCircle2, User, LogOut, LogIn, Bot } from 'lucide-react';
 
 type Tab = 'home' | 'courses' | 'pomodoro' | 'chat';
 
@@ -24,6 +24,7 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>('home');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isDesktopChatOpen, setIsDesktopChatOpen] = useState(true);
 
   const toggleFocusMode = () => {
     setViewMode(prev => prev === ViewMode.DEFAULT ? ViewMode.FOCUS : ViewMode.DEFAULT);
@@ -325,11 +326,34 @@ const App: React.FC = () => {
                 </div>
             </section>
 
-            {/* Desktop: Right Sidebar (Chat) */}
+            {/* Desktop: Right Sidebar (Chat) - Retractable */}
             {viewMode === ViewMode.DEFAULT && (
-                <aside className="hidden lg:block w-96 shrink-0 h-full border-l border-slate-200 bg-white">
-                    <ChatAssistant currentCapsule={currentCapsule} />
-                </aside>
+                <>
+                    <aside className={`
+                        hidden lg:block h-full bg-white border-l border-slate-200 transition-all duration-300 ease-in-out overflow-hidden
+                        ${isDesktopChatOpen ? 'w-96 opacity-100' : 'w-0 opacity-0 border-l-0'}
+                    `}>
+                        <div className="w-96 h-full"> {/* Inner container maintains width to prevent layout shifts */}
+                            <ChatAssistant 
+                                currentCapsule={currentCapsule} 
+                                onClose={() => setIsDesktopChatOpen(false)} 
+                            />
+                        </div>
+                    </aside>
+
+                    {/* Desktop: Floating Chat Trigger (Visible only when closed) */}
+                    {!isDesktopChatOpen && (
+                        <button
+                            onClick={() => setIsDesktopChatOpen(true)}
+                            className="hidden lg:flex fixed right-6 bottom-6 z-30 items-center gap-2 px-4 py-3 bg-white text-indigo-600 rounded-full shadow-lg border border-indigo-100 hover:scale-105 transition-all active:scale-95 group font-semibold"
+                        >
+                            <div className="bg-indigo-100 p-1.5 rounded-full text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                                <Bot size={20} />
+                            </div>
+                            Discuter avec l'IA
+                        </button>
+                    )}
+                </>
             )}
         </div>
 

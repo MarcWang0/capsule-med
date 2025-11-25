@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Capsule } from '../types';
 import { GoogleGenAI } from "@google/genai";
-import { Send, Bot, Loader2, AlertCircle } from 'lucide-react';
+import { Send, Bot, Loader2, AlertCircle, X } from 'lucide-react';
 
 interface ChatAssistantProps {
   currentCapsule: Capsule | null;
+  onClose?: () => void;
 }
 
 interface Message {
@@ -12,7 +13,7 @@ interface Message {
   text: string;
 }
 
-const ChatAssistant: React.FC<ChatAssistantProps> = ({ currentCapsule }) => {
+const ChatAssistant: React.FC<ChatAssistantProps> = ({ currentCapsule, onClose }) => {
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([
     { role: 'model', text: 'Bonjour ! Je suis Dr. Gemini. Posez-moi une question sur le cours en cours.' }
@@ -90,12 +91,23 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ currentCapsule }) => {
 
   return (
     <div className="flex flex-col h-full bg-white md:border-l md:border-slate-200">
-      <div className="bg-indigo-600 p-4 flex items-center gap-2 text-white shrink-0">
-        <Bot size={24} />
-        <div>
-            <h3 className="font-semibold text-base leading-none">Dr. Gemini</h3>
-            <span className="text-xs text-indigo-200">Assistant Médical IA</span>
+      <div className="bg-indigo-600 p-4 flex items-center justify-between text-white shrink-0">
+        <div className="flex items-center gap-2">
+            <Bot size={24} />
+            <div>
+                <h3 className="font-semibold text-base leading-none">Dr. Gemini</h3>
+                <span className="text-xs text-indigo-200">Assistant Médical IA</span>
+            </div>
         </div>
+        {onClose && (
+            <button 
+                onClick={onClose}
+                className="p-1 hover:bg-white/20 rounded-full transition-colors"
+                title="Fermer le chat"
+            >
+                <X size={20} />
+            </button>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
