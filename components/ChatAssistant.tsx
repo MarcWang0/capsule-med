@@ -22,8 +22,10 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ currentCapsule, onClose }
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Use process.env.API_KEY as per Google GenAI guidelines
-  const apiKey = process.env.API_KEY;
+  // Accès sécurisé à la variable d'environnement VITE_API_KEY
+  // On utilise (import.meta as any) pour éviter les erreurs de typage strict
+  const env = (import.meta as any).env || {};
+  const apiKey = env.VITE_API_KEY;
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -46,7 +48,7 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ currentCapsule, onClose }
     // Check for API Key validity gracefully
     if (!apiKey) {
          setMessages(prev => [...prev, { role: 'user', text: input }]);
-         setMessages(prev => [...prev, { role: 'model', text: "Erreur configuration : Clé API manquante. Ajoutez API_KEY dans les variables d'environnement." }]);
+         setMessages(prev => [...prev, { role: 'model', text: "Erreur configuration : Clé API manquante. Ajoutez la variable VITE_API_KEY dans Vercel." }]);
          setInput('');
         return;
     }
@@ -57,7 +59,8 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ currentCapsule, onClose }
     setIsLoading(true);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      // Utilisation de la clé récupérée via Vite
+      const ai = new GoogleGenAI({ apiKey: apiKey });
       
       const context = `
         Tu es un tuteur médical expert pour l'application "Capsule Med".
