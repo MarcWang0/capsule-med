@@ -21,7 +21,7 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ currentCapsule, onClose }
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Accès sécurisé à la variable d'environnement Vite
+  // Accès standard à la clé API (nécessite les types "vite/client" dans tsconfig.json)
   const apiKey = import.meta.env.VITE_API_KEY;
 
   const scrollToBottom = () => {
