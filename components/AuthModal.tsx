@@ -35,9 +35,10 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
       onClose();
     } catch (err: any) {
       console.error(err);
+      // Gestion des erreurs Firebase courantes
       if (err.code === 'auth/operation-not-allowed') {
-          setError("L'authentification Email/Mot de passe n'est pas activée dans la console Firebase.");
-      } else if (err.code === 'auth/invalid-credential') {
+          setError("Erreur : L'authentification Email/Mot de passe n'est pas activée dans Firebase Console.");
+      } else if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') {
           setError("Email ou mot de passe incorrect.");
       } else if (err.code === 'auth/email-already-in-use') {
           setError("Cet email est déjà utilisé.");
@@ -58,11 +59,13 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
       } catch (err: any) {
           console.error("Erreur Google:", err);
           if (err.code === 'auth/operation-not-allowed') {
-             setError("L'authentification Google n'est pas activée dans la console Firebase (Onglet Sign-in method).");
+             setError("Erreur : Google Sign-In n'est pas activé dans Firebase Console (Authentication > Sign-in method).");
           } else if (err.code === 'auth/popup-closed-by-user') {
              setError("Connexion annulée.");
+          } else if (err.code === 'auth/unauthorized-domain') {
+             setError("Erreur Domaine : Ajoutez ce domaine (vercel.app) dans Firebase > Auth > Settings > Authorized Domains.");
           } else {
-             setError("Impossible de se connecter avec Google. Vérifiez la configuration Firebase.");
+             setError(`Erreur (${err.code}): ${err.message}`);
           }
       } finally {
           setIsLoading(false);
@@ -92,7 +95,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
             </p>
           </div>
 
-          {/* Google Button Section */}
+          {/* Bouton Google */}
           <div className="mb-6">
             <button
               type="button"

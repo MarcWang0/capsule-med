@@ -84,7 +84,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                      displayName: firebaseUser.displayName,
                      completedCapsules: []
                    };
-                   // On utilise setDoc avec merge pour être sûr
+                   // On utilise setDoc avec merge pour être sûr que le doc est créé
                    await setDoc(docRef, { 
                        completedCapsules: [], 
                        email: firebaseUser.email, 
@@ -95,7 +95,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 }
             } catch (e) {
                 console.error("Erreur lecture Firestore:", e);
-                // Fallback UI minimal en cas d'erreur DB (ex: droits d'accès)
+                // Fallback UI minimal en cas d'erreur DB
                 setUser({ 
                     uid: firebaseUser.uid,
                     email: firebaseUser.email,
@@ -195,22 +195,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const newCompleted = [...user.completedCapsules, capsuleId];
 
     // 1. Mise à jour Optimiste (Immédiate) de l'UI
-    // On met à jour l'état local TOUT DE SUITE pour que l'utilisateur voie la coche verte
-    // sans attendre la réponse du serveur.
+    // On force la mise à jour de l'état local TOUT DE SUITE.
+    // L'utilisateur verra la coche verte instantanément.
     setUser({ ...user, completedCapsules: newCompleted });
 
     if (auth && db) {
       try {
           const userRef = doc(db, 'users', user.uid);
           // 2. Sauvegarde en arrière-plan
-          // Utilisation de setDoc avec merge:true au lieu de updateDoc.
-          // C'est plus robuste : si le document n'existait pas, il sera créé.
+          // Utilisation de setDoc avec merge:true pour robustesse (crée le doc si manquant)
           await setDoc(userRef, {
             completedCapsules: arrayUnion(capsuleId)
           }, { merge: true });
       } catch (e) {
           console.error("Erreur sauvegarde Firebase:", e);
-          console.warn("Vérifiez l'onglet 'Règles' dans Firestore Database si l'écriture échoue constamment.");
+          // Optionnel : En cas d'erreur réelle, on pourrait rollback l'état ici,
+          // mais pour l'expérience utilisateur, on garde souvent l'état optimiste.
       }
     } else {
       // Update Local (Mode Simulation)

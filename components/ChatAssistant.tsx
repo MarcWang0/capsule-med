@@ -21,6 +21,9 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ currentCapsule, onClose }
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Accès sécurisé à la variable d'environnement Vite
+  const apiKey = import.meta.env.VITE_API_KEY;
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -40,9 +43,9 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ currentCapsule, onClose }
     if (!input.trim()) return;
 
     // Check for API Key validity gracefully
-    if (!process.env.API_KEY) {
+    if (!apiKey) {
          setMessages(prev => [...prev, { role: 'user', text: input }]);
-         setMessages(prev => [...prev, { role: 'model', text: "Erreur: Clé API manquante. Veuillez configurer process.env.API_KEY." }]);
+         setMessages(prev => [...prev, { role: 'model', text: "Erreur configuration : Clé API manquante. Ajoutez VITE_API_KEY dans Vercel." }]);
          setInput('');
         return;
     }
@@ -53,30 +56,37 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ currentCapsule, onClose }
     setIsLoading(true);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const ai = new GoogleGenAI({ apiKey: apiKey });
+      
       const context = `
         Tu es un tuteur médical expert pour l'application "Capsule Med".
         L'étudiant regarde actuellement la capsule vidéo : "${currentCapsule?.title || 'Aucune vidéo sélectionnée'}".
         Sujet : ${currentCapsule?.subject || 'Général'}.
         Thème : ${currentCapsule?.theme || 'Général'}.
         
-        Réponds aux questions de l'étudiant de manière concise, pédagogique et encourageante.
-        Si la question n'a rien à voir avec la médecine ou le cours, ramène gentiment le sujet au cours.
+        Ta mission :
+        1. Répondre aux questions de l'étudiant de manière concise, pédagogique et encourageante.
+        2. Si la question porte sur le cours, donne une explication claire adaptée à un étudiant de première année de médecine (PASS/LAS).
+        3. Si la question n'a rien à voir avec la médecine ou le cours, ramène gentiment le sujet au cours.
+        4. Sois bienveillant et motivant.
       `;
 
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: [
-            { role: 'user', parts: [{ text: context + "\n\nQuestion étudiante: " + userMessage }] }
+            { 
+              role: 'user', 
+              parts: [{ text: `${context}\n\nQuestion de l'étudiant: ${userMessage}` }] 
+            }
         ],
       });
 
-      const responseText = response.text || "Désolé, je n'ai pas pu générer de réponse.";
+      const responseText = response.text || "Désolé, je n'ai pas pu générer de réponse précise.";
       setMessages(prev => [...prev, { role: 'model', text: responseText }]);
 
     } catch (error) {
-      console.error(error);
-      setMessages(prev => [...prev, { role: 'model', text: "Une erreur est survenue lors de la communication avec l'IA." }]);
+      console.error("Erreur Gemini:", error);
+      setMessages(prev => [...prev, { role: 'model', text: "Une erreur est survenue lors de la communication avec Dr. Gemini." }]);
     } finally {
       setIsLoading(false);
     }
@@ -156,9 +166,9 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ currentCapsule, onClose }
             <Send size={16} />
           </button>
         </div>
-        {!process.env.API_KEY && (
+        {!apiKey && (
              <div className="mt-2 text-[10px] text-red-500 flex items-center justify-center gap-1">
-                 <AlertCircle size={10} /> Mode démo sans clé API
+                 <AlertCircle size={10} /> Clé API manquante (Vercel)
              </div>
         )}
       </div>

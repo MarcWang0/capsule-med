@@ -2,12 +2,12 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, Auth } from 'firebase/auth';
 import { getFirestore, Firestore } from 'firebase/firestore';
 
-// Accès sécurisé à l'objet import.meta.env pour TypeScript
+// Accès sécurisé à l'objet import.meta.env pour TypeScript et Vite
+// On utilise 'any' pour éviter les erreurs de typage strict si les types Vite ne sont pas complets
 const env = (import.meta as any).env || {};
 
-// Construction de la config. 
-// NOTE : Vite remplace statiquement import.meta.env.VITE_... lors du build.
-// Si vous utilisez Vercel, assurez-vous que les variables commencent bien par VITE_
+// Configuration Firebase
+// Vite remplace statiquement ces variables lors du build (d'où l'importance du préfixe VITE_)
 const firebaseConfig = {
   apiKey: env.VITE_FIREBASE_API_KEY,
   authDomain: env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -22,20 +22,23 @@ let db: Firestore | null = null;
 
 const initFirebase = () => {
   try {
-    // Vérification stricte des clés critiques
-    if (firebaseConfig.apiKey && firebaseConfig.projectId && firebaseConfig.apiKey.length > 0) {
-        console.log("Tentative de connexion Firebase avec Project ID:", firebaseConfig.projectId);
+    // Vérification : On s'assure que la clé API est présente et n'est pas "undefined" (string)
+    if (firebaseConfig.apiKey && firebaseConfig.apiKey.length > 0 && firebaseConfig.apiKey !== "undefined") {
+        
+        console.log("🔥 Initialisation Firebase avec Project ID:", firebaseConfig.projectId);
+        
         const app = initializeApp(firebaseConfig);
         auth = getAuth(app);
         db = getFirestore(app);
-        console.log("✅ Firebase initialisé avec succès (Mode Cloud)");
+        
+        console.log("✅ Firebase connecté avec succès.");
     } else {
-        console.warn("⚠️ Clés Firebase introuvables ou incomplètes.");
-        console.warn("Vérifiez que vos variables d'environnement Vercel commencent bien par 'VITE_'");
-        console.warn("L'application passe en MODE SIMULATION (Données locales uniquement).");
+        console.warn("⚠️ Clés Firebase manquantes ou incorrectes.");
+        console.warn("L'application tourne en MODE SIMULATION (Stockage local).");
+        console.warn("Assurez-vous d'avoir défini les variables d'environnement VITE_FIREBASE_... dans Vercel.");
     }
   } catch (error) {
-    console.error("❌ Erreur critique lors de l'initialisation Firebase:", error);
+    console.error("❌ Erreur critique init Firebase:", error);
   }
 };
 
