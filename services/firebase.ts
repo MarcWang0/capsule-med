@@ -4,8 +4,8 @@ import { getFirestore, Firestore } from 'firebase/firestore';
 
 // Configuration Firebase utilisant les variables d'environnement VITE
 // Ces variables doivent être définies dans Vercel
-// Casting import.meta as any to avoid TypeScript errors when types are not fully configured
-const env = (import.meta as any).env;
+// Utilisation sécurisée de import.meta.env avec fallback pour éviter le crash
+const env = (import.meta as any).env || {};
 
 const firebaseConfig = {
   apiKey: env.VITE_FIREBASE_API_KEY,

@@ -5,7 +5,9 @@ import {
   createUserWithEmailAndPassword, 
   signOut as firebaseSignOut, 
   onAuthStateChanged,
-  updateProfile
+  updateProfile,
+  GoogleAuthProvider,
+  signInWithPopup
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 
@@ -21,6 +23,7 @@ interface AuthContextType {
   loading: boolean;
   loginWithEmail: (email: string, pass: string) => Promise<void>;
   registerWithEmail: (email: string, pass: string, name: string) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   markCapsuleAsCompleted: (capsuleId: number) => Promise<void>;
 }
@@ -82,7 +85,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                      completedCapsules: []
                    };
                    // On ne bloque pas l'UI si l'écriture échoue
-                   await setDoc(docRef, { completedCapsules: [], email: firebaseUser.email });
+                   await setDoc(docRef, { completedCapsules: [], email: firebaseUser.email, displayName: firebaseUser.displayName });
                    setUser(newUser);
                 }
             } catch (e) {
@@ -152,6 +155,24 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  const loginWithGoogle = async () => {
+    if (auth) {
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(auth, provider);
+      // La logique onAuthStateChanged gérera la création du user Firestore
+    } else {
+      // Simulation Google
+      await new Promise(r => setTimeout(r, 800));
+      const fakeUser: UserData = {
+        uid: 'local-google-user-' + Date.now(),
+        email: 'google-user@example.com',
+        displayName: 'Google User',
+        completedCapsules: []
+      };
+      saveLocalUser(fakeUser);
+    }
+  };
+
   const logout = async () => {
     if (auth) {
       await firebaseSignOut(auth);
@@ -187,7 +208,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, loginWithEmail, registerWithEmail, logout, markCapsuleAsCompleted }}>
+    <AuthContext.Provider value={{ user, loading, loginWithEmail, registerWithEmail, loginWithGoogle, logout, markCapsuleAsCompleted }}>
       {children}
     </AuthContext.Provider>
   );
