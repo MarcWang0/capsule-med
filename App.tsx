@@ -24,7 +24,7 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>('home');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [isDesktopChatOpen, setIsDesktopChatOpen] = useState(true);
+  const [isDesktopChatOpen, setIsDesktopChatOpen] = useState(false);
 
   const toggleFocusMode = () => {
     setViewMode(prev => prev === ViewMode.DEFAULT ? ViewMode.FOCUS : ViewMode.DEFAULT);
@@ -345,7 +345,7 @@ const App: React.FC = () => {
                     {!isDesktopChatOpen && (
                         <button
                             onClick={() => setIsDesktopChatOpen(true)}
-                            className="hidden lg:flex fixed right-6 bottom-6 z-30 items-center gap-2 px-4 py-3 bg-white text-indigo-600 rounded-full shadow-lg border border-indigo-100 hover:scale-105 transition-all active:scale-95 group font-semibold"
+                            className="hidden lg:flex fixed right-6 bottom-6 z-30 items-center gap-2 px-4 py-3 bg-white text-indigo-600 rounded-full shadow-lg border border-indigo-100 hover:scale-105 transition-all active:scale-95 group font-semibold animate-in fade-in slide-in-from-bottom-2 duration-300"
                         >
                             <div className="bg-indigo-100 p-1.5 rounded-full text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
                                 <Bot size={20} />

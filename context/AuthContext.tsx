@@ -1,4 +1,13 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { auth, db } from '../services/firebase';
+import { 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  signOut as firebaseSignOut, 
+  onAuthStateChanged,
+  updateProfile
+} from 'firebase/auth';
+import { doc, setDoc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 
 interface UserData {
   uid: string;
@@ -47,55 +56,134 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   useEffect(() => {
-    // Mode Simulation Local uniquement
-    loadLocalUser();
+    if (auth) {
+      // --- MODE FIREBASE RÉEL ---
+      const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+        if (firebaseUser) {
+          // Récupérer les données étendues (progression) depuis Firestore
+          if (db) {
+            try {
+                const docRef = doc(db, 'users', firebaseUser.uid);
+                const docSnap = await getDoc(docRef);
+                
+                if (docSnap.exists()) {
+                   setUser({ 
+                       uid: firebaseUser.uid,
+                       email: firebaseUser.email,
+                       displayName: firebaseUser.displayName,
+                       completedCapsules: docSnap.data().completedCapsules || [] 
+                   });
+                } else {
+                   // Créer le doc s'il n'existe pas (première connexion)
+                   const newUser: UserData = {
+                     uid: firebaseUser.uid,
+                     email: firebaseUser.email,
+                     displayName: firebaseUser.displayName,
+                     completedCapsules: []
+                   };
+                   // On ne bloque pas l'UI si l'écriture échoue
+                   await setDoc(docRef, { completedCapsules: [], email: firebaseUser.email });
+                   setUser(newUser);
+                }
+            } catch (e) {
+                console.error("Erreur Firestore:", e);
+                // Fallback UI minimal en cas d'erreur DB
+                setUser({ 
+                    uid: firebaseUser.uid,
+                    email: firebaseUser.email,
+                    displayName: firebaseUser.displayName,
+                    completedCapsules: [] 
+                });
+            }
+          }
+        } else {
+          setUser(null);
+        }
+        setLoading(false);
+      });
+      return unsubscribe;
+    } else {
+      // --- MODE SIMULATION LOCAL ---
+      loadLocalUser();
+    }
   }, []);
 
   const loginWithEmail = async (email: string, pass: string) => {
-    // Simulation locale
-    await new Promise(r => setTimeout(r, 800)); // Petit délai réaliste
-    // On récupère l'utilisateur local s'il existe déjà pour ne pas écraser la progression
-    const stored = localStorage.getItem('capsule_med_user');
-    let existingData = stored ? JSON.parse(stored) : null;
-    
-    // En mode simulation, on accepte le login sans vérification de mot de passe stricte
-    // ou on recrée une session pour cet email
-    const fakeUser: UserData = {
-      uid: existingData?.uid || 'local-user-' + Date.now(),
-      email: email,
-      displayName: existingData?.displayName || email.split('@')[0],
-      completedCapsules: existingData?.completedCapsules || []
-    };
-    saveLocalUser(fakeUser);
+    if (auth) {
+      await signInWithEmailAndPassword(auth, email, pass);
+    } else {
+      // Simulation
+      await new Promise(r => setTimeout(r, 800));
+      const stored = localStorage.getItem('capsule_med_user');
+      let existingData = stored ? JSON.parse(stored) : null;
+      
+      const fakeUser: UserData = {
+        uid: existingData?.uid || 'local-user-' + Date.now(),
+        email: email,
+        displayName: existingData?.displayName || email.split('@')[0],
+        completedCapsules: existingData?.completedCapsules || []
+      };
+      saveLocalUser(fakeUser);
+    }
   };
 
   const registerWithEmail = async (email: string, pass: string, name: string) => {
-    // Simulation locale
-    await new Promise(r => setTimeout(r, 800));
-    const fakeUser: UserData = {
-      uid: 'local-user-' + Date.now(),
-      email: email,
-      displayName: name,
-      completedCapsules: []
-    };
-    saveLocalUser(fakeUser);
+    if (auth) {
+      const result = await createUserWithEmailAndPassword(auth, email, pass);
+      await updateProfile(result.user, { displayName: name });
+      // Init Firestore
+      if (db) {
+        await setDoc(doc(db, 'users', result.user.uid), {
+            completedCapsules: [],
+            email: email,
+            displayName: name
+        });
+      }
+    } else {
+      // Simulation
+      await new Promise(r => setTimeout(r, 800));
+      const fakeUser: UserData = {
+        uid: 'local-user-' + Date.now(),
+        email: email,
+        displayName: name,
+        completedCapsules: []
+      };
+      saveLocalUser(fakeUser);
+    }
   };
 
   const logout = async () => {
-    saveLocalUser(null);
+    if (auth) {
+      await firebaseSignOut(auth);
+    } else {
+      saveLocalUser(null);
+    }
   };
 
   const markCapsuleAsCompleted = async (capsuleId: number) => {
     if (!user) return;
     
-    // Éviter les doublons
+    // Éviter les doublons localement pour réactivité immédiate
     if (user.completedCapsules.includes(capsuleId)) return;
-
     const newCompleted = [...user.completedCapsules, capsuleId];
 
-    // Update Local
-    const updatedUser = { ...user, completedCapsules: newCompleted };
-    saveLocalUser(updatedUser);
+    if (auth && db) {
+      try {
+          // Update Firebase
+          const userRef = doc(db, 'users', user.uid);
+          await updateDoc(userRef, {
+            completedCapsules: arrayUnion(capsuleId)
+          });
+          // Update local state
+          setUser({ ...user, completedCapsules: newCompleted });
+      } catch (e) {
+          console.error("Erreur sauvegarde progression", e);
+      }
+    } else {
+      // Update Local
+      const updatedUser = { ...user, completedCapsules: newCompleted };
+      saveLocalUser(updatedUser);
+    }
   };
 
   return (
