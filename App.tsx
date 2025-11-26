@@ -7,11 +7,12 @@ import VideoPlayer from './components/VideoPlayer';
 import Pomodoro from './components/Pomodoro';
 import ChatAssistant from './components/ChatAssistant';
 import Quiz from './components/Quiz';
+import DocumentLearning from './components/DocumentLearning';
 import AuthModal from './components/AuthModal';
 import { useAuth } from './context/AuthContext';
-import { Maximize2, Minimize2, GraduationCap, Timer, MessageCircle, PlayCircle, Menu, X, ArrowRight, BookOpen, Brain, Zap, CheckCircle2, User, LogOut, LogIn, Bot } from 'lucide-react';
+import { Maximize2, Minimize2, GraduationCap, Timer, MessageCircle, PlayCircle, Menu, X, ArrowRight, BookOpen, Brain, Zap, CheckCircle2, User, LogOut, LogIn, Bot, FileText, Sparkles } from 'lucide-react';
 
-type Tab = 'home' | 'courses' | 'pomodoro' | 'chat';
+type Tab = 'home' | 'courses' | 'pomodoro' | 'chat' | 'workshop';
 
 const App: React.FC = () => {
   const { user, logout } = useAuth();
@@ -63,15 +64,21 @@ const App: React.FC = () => {
           <div className="hidden md:flex items-center bg-slate-100/50 p-1 rounded-xl border border-slate-200/50">
              <button 
                 onClick={() => setActiveTab('courses')}
-                className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${activeTab === 'courses' ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-black/5' : 'text-slate-500 hover:text-slate-700'}`}
+                className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${activeTab === 'courses' ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-black/5' : 'text-slate-500 hover:text-slate-700'}`}
              >
-                Cours
+                <PlayCircle size={16}/> Capsules
+             </button>
+             <button 
+                onClick={() => setActiveTab('workshop')}
+                className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${activeTab === 'workshop' ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-black/5' : 'text-slate-500 hover:text-slate-700'}`}
+             >
+                <Sparkles size={16}/> Atelier IA
              </button>
              <button 
                 onClick={() => setActiveTab('pomodoro')}
-                className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${activeTab === 'pomodoro' ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-black/5' : 'text-slate-500 hover:text-slate-700'}`}
+                className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${activeTab === 'pomodoro' ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-black/5' : 'text-slate-500 hover:text-slate-700'}`}
              >
-                Pomodoro
+                <Timer size={16}/> Pomodoro
              </button>
           </div>
 
@@ -129,7 +136,7 @@ const App: React.FC = () => {
                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
                           <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-indigo-500"></span>
                         </span>
-                        Nouveau : Programme complet 2025
+                        Nouveau : Atelier IA pour vos PDF
                     </div>
                     
                     {/* Hero Title */}
@@ -200,44 +207,14 @@ const App: React.FC = () => {
                             </p>
                         </div>
 
-                        <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:shadow-indigo-100/50 transition-all hover:-translate-y-1">
-                            <div className="w-12 h-12 bg-amber-50 rounded-2xl flex items-center justify-center mb-6 text-amber-600">
-                                <Zap size={28} />
+                        <div onClick={() => setActiveTab('workshop')} className="bg-white p-8 rounded-3xl border border-slate-100 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:shadow-indigo-100/50 transition-all hover:-translate-y-1 cursor-pointer group">
+                            <div className="w-12 h-12 bg-fuchsia-50 rounded-2xl flex items-center justify-center mb-6 text-fuchsia-600 group-hover:bg-fuchsia-100 transition-colors">
+                                <Sparkles size={28} />
                             </div>
-                            <h3 className="text-xl font-bold text-slate-900 mb-3">Productivité Intégrée</h3>
+                            <h3 className="text-xl font-bold text-slate-900 mb-3">Nouveau : Atelier IA</h3>
                             <p className="text-slate-500 leading-relaxed">
-                                Alternez travail intense et pauses avec le Pomodoro. Activez le Mode Focus pour éliminer toute distraction.
+                                Importez vos PDF de cours. L'IA génère automatiquement des fiches de révision, des quiz et des résumés.
                             </p>
-                        </div>
-                    </div>
-
-                    {/* Stats Bar */}
-                    <div className="w-full bg-white rounded-3xl border border-slate-200 p-8 md:p-12 shadow-sm">
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-12">
-                            <div className="flex flex-col items-center md:items-start">
-                                <div className="text-4xl font-extrabold text-slate-900 mb-2">112</div>
-                                <div className="text-sm font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                                    <CheckCircle2 size={16} className="text-green-500"/> Capsules
-                                </div>
-                            </div>
-                            <div className="flex flex-col items-center md:items-start">
-                                <div className="text-4xl font-extrabold text-slate-900 mb-2">3</div>
-                                <div className="text-sm font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                                    <CheckCircle2 size={16} className="text-green-500"/> Matières
-                                </div>
-                            </div>
-                            <div className="flex flex-col items-center md:items-start">
-                                <div className="text-4xl font-extrabold text-slate-900 mb-2">24/7</div>
-                                <div className="text-sm font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                                    <CheckCircle2 size={16} className="text-green-500"/> Accès illimité
-                                </div>
-                            </div>
-                            <div className="flex flex-col items-center md:items-start">
-                                <div className="text-4xl font-extrabold text-slate-900 mb-2">100%</div>
-                                <div className="text-sm font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                                    <CheckCircle2 size={16} className="text-green-500"/> Gratuit
-                                </div>
-                            </div>
                         </div>
                     </div>
 
@@ -357,6 +334,11 @@ const App: React.FC = () => {
             )}
         </div>
 
+        {/* VIEW: WORKSHOP (New AI PDF Module) */}
+        <div className={`flex-1 w-full h-full overflow-hidden ${activeTab === 'workshop' ? 'block' : 'hidden'}`}>
+            <DocumentLearning />
+        </div>
+
         {/* VIEW: POMODORO (Separate Page) */}
         <div className={`flex-1 w-full h-full overflow-y-auto bg-slate-50 ${activeTab === 'pomodoro' ? 'block' : 'hidden'}`}>
             <div className="h-full max-w-3xl mx-auto p-4 md:p-8 flex flex-col justify-center">
@@ -386,7 +368,14 @@ const App: React.FC = () => {
                 className={`flex flex-col items-center gap-1 p-2 w-full transition-colors ${activeTab === 'courses' ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
             >
                 <PlayCircle size={24} className={activeTab === 'courses' ? 'fill-indigo-100' : ''} />
-                <span className="text-[10px] font-medium">Cours</span>
+                <span className="text-[10px] font-medium">Capsules</span>
+            </button>
+            <button 
+                onClick={() => setActiveTab('workshop')}
+                className={`flex flex-col items-center gap-1 p-2 w-full transition-colors ${activeTab === 'workshop' ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+                <Sparkles size={24} className={activeTab === 'workshop' ? 'fill-indigo-100' : ''} />
+                <span className="text-[10px] font-medium">Atelier IA</span>
             </button>
             <button 
                 onClick={() => setActiveTab('pomodoro')}
@@ -394,13 +383,6 @@ const App: React.FC = () => {
             >
                 <Timer size={24} className={activeTab === 'pomodoro' ? 'fill-indigo-100' : ''} />
                 <span className="text-[10px] font-medium">Pomodoro</span>
-            </button>
-            <button 
-                onClick={() => setActiveTab('chat')}
-                className={`flex flex-col items-center gap-1 p-2 w-full transition-colors ${activeTab === 'chat' ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
-            >
-                <MessageCircle size={24} className={activeTab === 'chat' ? 'fill-indigo-100' : ''} />
-                <span className="text-[10px] font-medium">Chat IA</span>
             </button>
           </nav>
       )}
