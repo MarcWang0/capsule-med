@@ -106,8 +106,14 @@ const DocumentLearning: React.FC = () => {
 
       canvas.width = Math.floor(viewport.width * outputScale);
       canvas.height = Math.floor(viewport.height * outputScale);
-      canvas.style.width = Math.floor(viewport.width) + "px";
-      canvas.style.height = Math.floor(viewport.height) + "px";
+      
+      // RESPONSIVE FIX:
+      // We set the max-width to the viewport width to respect the scale on desktop
+      // But we set width to 100% so it shrinks on mobile
+      // And CRUCIALLY, height to 'auto' so it maintains aspect ratio when width shrinks
+      canvas.style.maxWidth = Math.floor(viewport.width) + "px";
+      canvas.style.width = "100%";
+      canvas.style.height = "auto";
 
       const transform = outputScale !== 1
         ? [outputScale, 0, 0, outputScale, 0, 0]
