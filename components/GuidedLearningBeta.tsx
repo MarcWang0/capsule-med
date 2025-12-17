@@ -41,7 +41,6 @@ const GuidedLearningBeta: React.FC<GuidedLearningBetaProps> = ({ initialFile, in
     if (initialFile || initialText) handleStart();
   }, []);
 
-  // Utilitaire pour extraire proprement le JSON
   const extractJson = (text: string) => {
     try {
       const match = text.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
@@ -53,11 +52,12 @@ const GuidedLearningBeta: React.FC<GuidedLearningBetaProps> = ({ initialFile, in
 
   const callGemini = async (prompt: string, jsonMode: boolean = false): Promise<string> => {
     try {
-      if (!process.env.API_KEY) {
-        throw new Error("Clé API manquante dans l'environnement.");
+      const apiKey = process.env.API_KEY;
+      if (!apiKey || apiKey === "undefined") {
+        throw new Error("Clé API Gemini non détectée. Vérifiez vos variables d'environnement.");
       }
       
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const ai = new GoogleGenAI({ apiKey });
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: prompt,
