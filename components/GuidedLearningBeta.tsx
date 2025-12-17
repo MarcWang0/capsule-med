@@ -53,8 +53,12 @@ const GuidedLearningBeta: React.FC<GuidedLearningBetaProps> = ({ initialFile, in
   const callGemini = async (prompt: string, jsonMode: boolean = false): Promise<string> => {
     try {
       const apiKey = process.env.API_KEY;
-      if (!apiKey || apiKey === "undefined") {
-        throw new Error("Clé API Gemini non détectée. Vérifiez vos variables d'environnement.");
+      
+      // Diagnostic plus précis
+      if (!apiKey || apiKey === "undefined" || apiKey === "" || apiKey === "null") {
+        const error = "Clé API Gemini non configurée sur Vercel. Allez dans Settings > Environment Variables et ajoutez API_KEY.";
+        console.error(error);
+        throw new Error(error);
       }
       
       const ai = new GoogleGenAI({ apiKey });
@@ -73,7 +77,7 @@ const GuidedLearningBeta: React.FC<GuidedLearningBetaProps> = ({ initialFile, in
       }
       return text;
     } catch (error: any) {
-      console.error("Gemini Error:", error);
+      console.error("Gemini API Connection Error:", error);
       throw error;
     }
   };
@@ -241,13 +245,13 @@ const GuidedLearningBeta: React.FC<GuidedLearningBetaProps> = ({ initialFile, in
             <p className="text-slate-500 font-black animate-pulse uppercase tracking-widest text-xs mt-8 text-center px-6">Analyse structurelle et préparation du focus...</p>
         </div>
       ) : step === 'init' && errorMsg ? (
-        <div className="flex-1 flex flex-col items-center justify-center bg-white p-8">
-            <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mb-4">
+        <div className="flex-1 flex flex-col items-center justify-center bg-white p-8 text-center">
+            <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mb-4 mx-auto">
                 <AlertCircle size={32} />
             </div>
             <h3 className="text-xl font-bold text-slate-800 mb-2">Erreur de communication IA</h3>
-            <p className="text-slate-500 text-center max-w-md mb-6">{errorMsg}</p>
-            <button onClick={handleStart} className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold shadow-lg hover:bg-indigo-700">Réessayer</button>
+            <p className="text-slate-500 max-w-md mb-6 leading-relaxed">{errorMsg}</p>
+            <button onClick={handleStart} className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold shadow-lg hover:bg-indigo-700 transition-all active:scale-95">Réessayer</button>
         </div>
       ) : (
         <div className="flex-1 flex overflow-hidden">
@@ -318,7 +322,6 @@ const GuidedLearningBeta: React.FC<GuidedLearningBetaProps> = ({ initialFile, in
   );
 };
 
-// Fixed: Added React.FC type to handle key prop correctly in recursive map
 const MindMapTree: React.FC<{ 
     node: MindMapNode, 
     level?: number, 
