@@ -40,7 +40,7 @@ const GuidedLearningBeta: React.FC<GuidedLearningBetaProps> = ({ initialFile, in
     if (initialFile || initialText) handleStart();
   }, []);
 
-  const callGemini = async (prompt: string, jsonMode: boolean = false) => {
+  const callGemini = async (prompt: string, jsonMode: boolean = false): Promise<string> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
@@ -50,7 +50,7 @@ const GuidedLearningBeta: React.FC<GuidedLearningBetaProps> = ({ initialFile, in
         temperature: 0.1 
       } : { temperature: 0.7 }
     });
-    return response.text;
+    return response.text || "";
   };
 
   const handleStart = async () => {
@@ -63,7 +63,9 @@ const GuidedLearningBeta: React.FC<GuidedLearningBetaProps> = ({ initialFile, in
         FORMAT JSON : { "id": "root", "label": "Titre", "description": "...", "children": [{"id": "c1", "label": "Chapitre", "description": "..."}] }`;
 
         const res = await callGemini(prompt, true);
-        const data = JSON.parse(res.replace(/```json/g, '').replace(/```/g, ''));
+        if (!res) throw new Error("Réponse IA vide");
+        
+        const data = JSON.parse(res.replace(/```json/g, '').replace(/```/g, '').trim());
         
         const initialMap = { ...data, isExpanded: true, isLoaded: true };
         setMindMap(initialMap);
@@ -86,7 +88,9 @@ const GuidedLearningBeta: React.FC<GuidedLearningBetaProps> = ({ initialFile, in
         FORMAT JSON : [{"id": "${nodeId}_pre", "label": "...", "description": "..."}]`;
 
         const res = await callGemini(prompt, true);
-        const children = JSON.parse(res.replace(/```json/g, '').replace(/```/g, ''));
+        if (!res) return;
+
+        const children = JSON.parse(res.replace(/```json/g, '').replace(/```/g, '').trim());
         
         setMindMap(prev => {
             if (!prev) return null;
@@ -102,24 +106,20 @@ const GuidedLearningBeta: React.FC<GuidedLearningBetaProps> = ({ initialFile, in
     }
   };
 
-  // Focus ultra-fluide avec Zoom prononcé (1.3x)
   const focusOnNode = useCallback((nodeId: string) => {
-    // On utilise requestAnimationFrame pour s'assurer que le DOM est prêt
     requestAnimationFrame(() => {
         const element = document.getElementById(`node-${nodeId}`);
         const viewport = viewportRef.current;
         if (!element || !viewport) return;
 
-        const targetScale = 1.3; // Zoom augmenté pour une lisibilité parfaite
+        const targetScale = 1.3; 
         
         const rect = element.getBoundingClientRect();
         const viewRect = viewport.getBoundingClientRect();
 
-        // Calcul du centre cible
         const deltaX = (viewRect.left + viewRect.width / 2) - (rect.left + rect.width / 2);
         const deltaY = (viewRect.top + viewRect.height / 2) - (rect.top + rect.height / 2);
 
-        // On applique les deux changements en une seule mise à jour d'état
         setScale(targetScale);
         setOffset(prev => ({
             x: prev.x + deltaX,
@@ -187,9 +187,9 @@ const GuidedLearningBeta: React.FC<GuidedLearningBetaProps> = ({ initialFile, in
     setIsLoadingChat(true);
     try {
         const res = await callGemini(`Tuteur médecine. Question: ${text}`);
-        setChatMessages(prev => [...prev, { role: 'model', text: res }]);
+        setChatMessages(prev => [...prev, { role: 'model', text: res || "Désolé, je n'ai pas pu obtenir de réponse." }]);
     } catch (e) {
-        setChatMessages(prev => [...prev, { role: 'model', text: "Erreur IA." }]);
+        setChatMessages(prev => [...prev, { role: 'model', text: "Erreur lors de la communication avec l'IA." }]);
     } finally {
         setIsLoadingChat(false);
     }
@@ -284,7 +284,13 @@ const GuidedLearningBeta: React.FC<GuidedLearningBetaProps> = ({ initialFile, in
   );
 };
 
-const MindMapTree = ({ node, level = 0, onExpand, onToggleDescription }: { node: MindMapNode, level?: number, onExpand: (id: string, l: string, d: number) => void, onToggleDescription: (id: string) => void }) => {
+// Fixed: Added React.FC type to handle key prop correctly in recursive map
+const MindMapTree: React.FC<{ 
+    node: MindMapNode, 
+    level?: number, 
+    onExpand: (id: string, l: string, d: number) => void, 
+    onToggleDescription: (id: string) => void 
+}> = ({ node, level = 0, onExpand, onToggleDescription }) => {
     const hasChildren = node.children && node.children.length > 0;
     const canExpand = level < MAX_DEPTH;
     

@@ -682,7 +682,8 @@ const ToolTab = ({active, onClick, icon, label}: any) => (
     </button>
 );
 
-const FlashcardItem = ({card}: {card: Flashcard}) => {
+// Fixed: Added React.FC type to handle key prop correctly in parent map
+const FlashcardItem: React.FC<{card: Flashcard}> = ({card}) => {
     const [flipped, setFlipped] = useState(false);
     return (
         <div 
