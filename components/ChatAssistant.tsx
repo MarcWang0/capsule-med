@@ -22,11 +22,6 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ currentCapsule, onClose }
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Accès sécurisé à la variable d'environnement VITE_API_KEY
-  // On utilise (import.meta as any) pour éviter les erreurs de typage strict
-  const env = (import.meta as any).env || {};
-  const apiKey = env.VITE_API_KEY;
-
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -35,7 +30,6 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ currentCapsule, onClose }
     scrollToBottom();
   }, [messages]);
 
-  // Reset chat when video changes
   useEffect(() => {
     if (currentCapsule) {
         setMessages([{ role: 'model', text: `Nous regardons **"${currentCapsule.title}"**. Une question sur ce sujet ?` }]);
@@ -45,22 +39,13 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ currentCapsule, onClose }
   const handleSend = async () => {
     if (!input.trim()) return;
 
-    // Check for API Key validity gracefully
-    if (!apiKey) {
-         setMessages(prev => [...prev, { role: 'user', text: input }]);
-         setMessages(prev => [...prev, { role: 'model', text: "Erreur configuration : Clé API manquante. Ajoutez la variable VITE_API_KEY dans Vercel." }]);
-         setInput('');
-        return;
-    }
-
     const userMessage = input;
     setInput('');
     setMessages(prev => [...prev, { role: 'user', text: userMessage }]);
     setIsLoading(true);
 
     try {
-      // Utilisation de la clé récupérée via Vite
-      const ai = new GoogleGenAI({ apiKey: apiKey });
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       
       const context = `
         Tu es un tuteur médical expert pour l'application "Capsule Med".
@@ -77,7 +62,7 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ currentCapsule, onClose }
       `;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3-flash-preview',
         contents: [
             { 
               role: 'user', 
@@ -140,7 +125,6 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ currentCapsule, onClose }
             >
               <ReactMarkdown
                 components={{
-                  // Personnalisation des éléments Markdown pour s'adapter au style du chat
                   p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} />,
                   ul: ({node, ...props}) => <ul className="list-disc pl-4 mb-2 space-y-1" {...props} />,
                   ol: ({node, ...props}) => <ol className="list-decimal pl-4 mb-2 space-y-1" {...props} />,
@@ -183,11 +167,6 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ currentCapsule, onClose }
             <Send size={16} />
           </button>
         </div>
-        {!apiKey && (
-             <div className="mt-2 text-[10px] text-red-500 flex items-center justify-center gap-1">
-                 <AlertCircle size={10} /> Clé API manquante
-             </div>
-        )}
       </div>
     </div>
   );

@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { extractTextFromPdf } from '../services/pdfService';
 import { GoogleGenAI } from "@google/genai";
-import { Upload, FileText, MessageSquare, List, HelpCircle, FileInput, Loader2, Send, RotateCcw, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, AlertTriangle, Eye, Bot, Play, X, ArrowLeft, ArrowRight } from 'lucide-react';
+import { Upload, FileText, MessageSquare, List, HelpCircle, FileInput, Loader2, Send, RotateCcw, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, AlertTriangle, Eye, Bot, Play, X, ArrowLeft, ArrowRight, Sparkles, BrainCircuit } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import Quiz from './Quiz';
 import { QuizData } from '../types';
 import * as pdfjsLib from 'pdfjs-dist';
+import GuidedLearningBeta from './GuidedLearningBeta';
 
 // Re-configuration du worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
@@ -20,6 +21,7 @@ interface Flashcard {
 
 const DocumentLearning: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
+  const [showBeta, setShowBeta] = useState(false);
   
   // PDF Rendering State
   const [pdfDocument, setPdfDocument] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
@@ -37,7 +39,7 @@ const DocumentLearning: React.FC = () => {
   
   // UI State
   const [activeTool, setActiveTool] = useState<Tool>('chat');
-  const [mobileView, setMobileView] = useState<MobileView>('document'); // New state for mobile toggle
+  const [mobileView, setMobileView] = useState<MobileView>('document'); 
   const [isLoadingAI, setIsLoadingAI] = useState(false);
   
   // Feature States
@@ -51,20 +53,6 @@ const DocumentLearning: React.FC = () => {
   const [isReviewMode, setIsReviewMode] = useState(false);
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
   const [isReviewFlipped, setIsReviewFlipped] = useState(false);
-
-  // --- API KEY ROBUST ACCESS ---
-  const getApiKey = () => {
-    if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
-        return process.env.API_KEY;
-    }
-    const metaEnv = (import.meta as any).env;
-    if (metaEnv && metaEnv.VITE_API_KEY) {
-        return metaEnv.VITE_API_KEY;
-    }
-    return '';
-  };
-  
-  const apiKey = getApiKey();
 
   // --- PDF RENDERING LOGIC (High DPI) ---
 
@@ -100,17 +88,12 @@ const DocumentLearning: React.FC = () => {
 
       if (!context) return;
 
-      // High DPI Rendering Logic
       const outputScale = window.devicePixelRatio || 1;
       const viewport = page.getViewport({ scale });
 
       canvas.width = Math.floor(viewport.width * outputScale);
       canvas.height = Math.floor(viewport.height * outputScale);
       
-      // RESPONSIVE FIX:
-      // We set the max-width to the viewport width to respect the scale on desktop
-      // But we set width to 100% so it shrinks on mobile
-      // And CRUCIALLY, height to 'auto' so it maintains aspect ratio when width shrinks
       canvas.style.maxWidth = Math.floor(viewport.width) + "px";
       canvas.style.width = "100%";
       canvas.style.height = "auto";
@@ -137,7 +120,6 @@ const DocumentLearning: React.FC = () => {
       }
     };
 
-    // Only render if the canvas is actually visible (optimization for mobile)
     if (mobileView === 'document' || window.innerWidth >= 768) {
         requestAnimationFrame(() => renderPage());
     }
@@ -152,7 +134,6 @@ const DocumentLearning: React.FC = () => {
     setIsExtracting(true);
     setExtractionWarning(null);
     
-    // Reset States
     setPdfText('');
     setSummary('');
     setFlashcards([]);
@@ -207,7 +188,6 @@ const DocumentLearning: React.FC = () => {
     }
   };
 
-  // --- REVIEW MODE HANDLERS ---
   const startReview = () => {
     setCurrentCardIndex(0);
     setIsReviewFlipped(false);
@@ -216,8 +196,8 @@ const DocumentLearning: React.FC = () => {
 
   const nextCard = () => {
     if (currentCardIndex < flashcards.length - 1) {
-      setIsReviewFlipped(false); // Reset flip
-      setTimeout(() => setCurrentCardIndex(prev => prev + 1), 150); // Tiny delay for smooth reset
+      setIsReviewFlipped(false); 
+      setTimeout(() => setCurrentCardIndex(prev => prev + 1), 150);
     }
   };
 
@@ -239,17 +219,13 @@ const DocumentLearning: React.FC = () => {
   // --- AI LOGIC ---
 
   const callGemini = async (prompt: string, jsonMode: boolean = false): Promise<string> => {
-    if (!apiKey) {
-        throw new Error("Clé API manquante. Ajoutez 'VITE_API_KEY' dans Vercel.");
-    }
-    
     if (!pdfText) {
         throw new Error("Aucun texte extrait du PDF. L'IA ne peut pas répondre.");
     }
     
-    const ai = new GoogleGenAI({ apiKey });
-    const modelId = 'gemini-2.5-flash';
-    const contextText = pdfText.length > 800000 ? pdfText.substring(0, 800000) + "...(tronqué)" : pdfText;
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const modelId = 'gemini-3-flash-preview';
+    const contextText = pdfText.length > 500000 ? pdfText.substring(0, 500000) + "...(tronqué)" : pdfText;
 
     const fullPrompt = `CONTEXTE (Cours PDF) :\n${contextText}\n\nTACHE :\n${prompt}`;
     const config: any = {};
@@ -363,8 +339,6 @@ const DocumentLearning: React.FC = () => {
     } finally { setIsLoadingAI(false); }
   };
 
-  // --- RENDER ---
-
   const renderFlashcards = () => (
     <div className="space-y-6">
       <div className="flex flex-wrap gap-2 justify-between items-center mb-4">
@@ -398,6 +372,10 @@ const DocumentLearning: React.FC = () => {
     </div>
   );
 
+  if (showBeta) {
+      return <GuidedLearningBeta initialFile={file} initialText={pdfText} onBack={() => setShowBeta(false)} />;
+  }
+
   return (
     <div 
       className="flex flex-col md:flex-row h-full bg-white relative"
@@ -405,12 +383,10 @@ const DocumentLearning: React.FC = () => {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       onKeyDown={handleKeyDown}
-      tabIndex={0} // Allow div to catch keydown events
+      tabIndex={0} 
     >
-      {/* REVIEW MODE OVERLAY */}
       {isReviewMode && flashcards.length > 0 && (
           <div className="fixed inset-0 z-[100] bg-slate-900/95 backdrop-blur-sm flex flex-col items-center justify-center p-4 md:p-8 animate-in fade-in duration-300">
-              {/* Review Header */}
               <div className="w-full max-w-3xl flex justify-between items-center mb-8 text-white/80">
                   <span className="font-mono font-medium bg-white/10 px-3 py-1 rounded-full">
                       Carte {currentCardIndex + 1} / {flashcards.length}
@@ -418,19 +394,16 @@ const DocumentLearning: React.FC = () => {
                   <button 
                     onClick={() => setIsReviewMode(false)}
                     className="p-2 hover:bg-white/10 rounded-full transition-colors text-white"
-                    title="Quitter le mode révision"
                   >
                       <X size={32} />
                   </button>
               </div>
 
-              {/* Main Flashcard */}
               <div 
                 className="w-full max-w-2xl aspect-[4/3] md:aspect-[3/2] perspective cursor-pointer group"
                 onClick={() => setIsReviewFlipped(!isReviewFlipped)}
               >
                   <div className={`relative w-full h-full transition-all duration-500 transform-style-3d ${isReviewFlipped ? 'rotate-y-180' : ''}`}>
-                      {/* FRONT */}
                       <div className="absolute inset-0 backface-hidden bg-white rounded-3xl shadow-2xl flex flex-col items-center justify-center p-8 md:p-12 text-center border border-white/10">
                           <span className="text-sm font-bold text-indigo-500 uppercase tracking-widest mb-6">Question</span>
                           <div className="prose prose-lg md:prose-xl max-w-none text-slate-800 font-medium leading-relaxed overflow-y-auto max-h-full">
@@ -441,7 +414,6 @@ const DocumentLearning: React.FC = () => {
                           </span>
                       </div>
 
-                      {/* BACK */}
                       <div className="absolute inset-0 backface-hidden rotate-y-180 bg-indigo-600 rounded-3xl shadow-2xl flex flex-col items-center justify-center p-8 md:p-12 text-center text-white border border-white/10">
                           <span className="text-sm font-bold text-indigo-200 uppercase tracking-widest mb-6">Réponse</span>
                           <div className="prose prose-lg md:prose-xl max-w-none text-white/90 leading-relaxed overflow-y-auto max-h-full prose-strong:text-white prose-strong:font-bold">
@@ -451,7 +423,6 @@ const DocumentLearning: React.FC = () => {
                   </div>
               </div>
 
-              {/* Navigation Controls */}
               <div className="flex items-center gap-8 mt-10">
                   <button 
                     onClick={(e) => { e.stopPropagation(); prevCard(); }}
@@ -476,7 +447,6 @@ const DocumentLearning: React.FC = () => {
           </div>
       )}
 
-      {/* DRAG OVERLAY */}
       {isDragging && (
         <div className="absolute inset-0 z-50 bg-indigo-600/10 backdrop-blur-sm border-4 border-indigo-600 border-dashed m-4 rounded-3xl flex items-center justify-center">
             <div className="bg-white p-8 rounded-2xl shadow-2xl flex flex-col items-center animate-bounce-slow">
@@ -486,7 +456,6 @@ const DocumentLearning: React.FC = () => {
         </div>
       )}
 
-      {/* LEFT: PDF VIEWER (Visible on Desktop OR if mobileView is 'document') */}
       <div className={`flex-1 bg-slate-200/50 h-full border-r border-slate-200 relative flex flex-col overflow-hidden ${mobileView === 'ai' ? 'hidden md:flex' : 'flex'}`}>
         {!file ? (
           <div className="flex-1 flex flex-col items-center justify-center p-8 m-4 md:m-8 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100 transition-colors">
@@ -502,7 +471,6 @@ const DocumentLearning: React.FC = () => {
           </div>
         ) : (
           <div className="w-full h-full flex flex-col">
-            {/* Toolbar */}
             <div className="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-2 md:px-4 shrink-0 shadow-sm z-10 overflow-x-auto">
                 <div className="flex items-center gap-2 shrink-0">
                     <span className="text-sm font-semibold text-slate-700 truncate max-w-[100px] md:max-w-[200px]" title={file.name}>{file.name}</span>
@@ -522,7 +490,6 @@ const DocumentLearning: React.FC = () => {
                 </div>
             </div>
 
-            {/* Canvas Container */}
             <div className="flex-1 overflow-auto flex justify-center p-4 md:p-8 relative bg-slate-100 pb-24 md:pb-8">
                <canvas ref={canvasRef} className="shadow-xl rounded-sm bg-white max-w-full" />
                
@@ -537,10 +504,25 @@ const DocumentLearning: React.FC = () => {
         )}
       </div>
 
-      {/* RIGHT: AI TOOLS (Visible on Desktop OR if mobileView is 'ai') */}
       <div className={`w-full md:w-96 lg:w-[450px] bg-white flex flex-col shrink-0 z-10 shadow-xl md:border-l md:border-slate-200 h-full ${mobileView === 'document' ? 'hidden md:flex' : 'flex'}`}>
         
-        {/* Tool Tabs */}
+        <div className="bg-indigo-600 p-4 text-white">
+            <div className="flex items-center justify-between mb-3">
+                <span className="text-[10px] font-bold bg-white/20 px-2 py-0.5 rounded-full uppercase tracking-wider">Beta</span>
+                <Sparkles size={16} className="text-amber-300"/>
+            </div>
+            <h4 className="font-bold text-sm mb-1 flex items-center gap-2">
+                <BrainCircuit size={16}/> Apprentissage Guidé
+            </h4>
+            <p className="text-xs text-indigo-100 mb-3 leading-relaxed">Générez une Mind Map interactive de votre cours pour une révision visuelle.</p>
+            <button 
+                onClick={() => setShowBeta(true)}
+                className="w-full py-2 bg-white text-indigo-600 rounded-lg text-xs font-bold hover:bg-indigo-50 transition-all shadow-md flex items-center justify-center gap-2"
+            >
+                Essayer la version Beta <ArrowRight size={14}/>
+            </button>
+        </div>
+
         <div className="flex border-b border-slate-100">
             <ToolTab active={activeTool === 'chat'} onClick={() => setActiveTool('chat')} icon={<MessageSquare size={18}/>} label="Chat" />
             <ToolTab active={activeTool === 'summary'} onClick={() => {setActiveTool('summary'); if(!summary && pdfText) generateSummary();}} icon={<FileText size={18}/>} label="Résumé" />
@@ -548,7 +530,6 @@ const DocumentLearning: React.FC = () => {
             <ToolTab active={activeTool === 'quiz'} onClick={() => {setActiveTool('quiz'); if(!generatedQuiz && pdfText) generateQuiz();}} icon={<HelpCircle size={18}/>} label="Quiz" />
         </div>
 
-        {/* Content Area */}
         <div className="flex-1 overflow-y-auto p-4 bg-slate-50 relative pb-24 md:pb-4">
             
             {!pdfText && !isExtracting && (
@@ -558,7 +539,6 @@ const DocumentLearning: React.FC = () => {
                 </div>
             )}
             
-            {/* Extraction Warning for Scanned PDFs */}
             {extractionWarning && (
                 <div className="mx-4 mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3 text-amber-800 text-sm mb-4">
                     <AlertTriangle size={20} className="shrink-0 text-amber-600" />
@@ -572,7 +552,6 @@ const DocumentLearning: React.FC = () => {
                  </div>
             )}
 
-            {/* VIEW: CHAT */}
             {activeTool === 'chat' && (
                 <div className="flex flex-col h-full">
                      <div className="flex-1 space-y-6 mb-4">
@@ -611,7 +590,6 @@ const DocumentLearning: React.FC = () => {
                 </div>
             )}
 
-            {/* VIEW: SUMMARY */}
             {activeTool === 'summary' && (
                 <div className="prose prose-sm prose-indigo max-w-none bg-white p-8 rounded-xl border border-slate-200 shadow-sm">
                     {summary ? (
@@ -636,10 +614,8 @@ const DocumentLearning: React.FC = () => {
                 </div>
             )}
 
-            {/* VIEW: FLASHCARDS */}
             {activeTool === 'flashcards' && renderFlashcards()}
 
-            {/* VIEW: QUIZ */}
             {activeTool === 'quiz' && (
                 <div>
                     {!generatedQuiz ? (
@@ -659,7 +635,6 @@ const DocumentLearning: React.FC = () => {
         </div>
       </div>
 
-      {/* MOBILE VIEW TOGGLE BUTTON (Only visible on mobile) */}
       {file && (
           <div className="md:hidden fixed bottom-24 left-1/2 -translate-x-1/2 z-50 bg-white border border-slate-200 shadow-xl rounded-full p-1.5 flex gap-1">
               <button 
@@ -690,6 +665,8 @@ const DocumentLearning: React.FC = () => {
         .transform-style-3d { transform-style: preserve-3d; }
         .backface-hidden { backface-visibility: hidden; }
         .rotate-y-180 { transform: rotateY(180deg); }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
     </div>
   );
@@ -713,7 +690,6 @@ const FlashcardItem = ({card}: {card: Flashcard}) => {
             className="group perspective h-40 cursor-pointer"
         >
             <div className={`relative w-full h-full transition-all duration-500 transform-style-3d ${flipped ? 'rotate-y-180' : ''}`}>
-                {/* FRONT */}
                 <div className="absolute inset-0 backface-hidden bg-white border border-slate-200 p-4 rounded-xl shadow-sm flex flex-col items-center justify-center text-center hover:border-indigo-300 transition-colors">
                     <span className="text-xs font-bold text-indigo-500 uppercase tracking-wider mb-2">Question</span>
                     <div className="font-medium text-slate-800 text-sm line-clamp-3">
@@ -721,7 +697,6 @@ const FlashcardItem = ({card}: {card: Flashcard}) => {
                     </div>
                     <span className="absolute bottom-2 right-2 text-xs text-slate-400">Cliquer pour retourner</span>
                 </div>
-                {/* BACK */}
                 <div className="absolute inset-0 backface-hidden rotate-y-180 bg-indigo-600 p-4 rounded-xl shadow-md flex flex-col items-center justify-center text-center text-white">
                     <span className="text-xs font-bold text-indigo-200 uppercase tracking-wider mb-2">Réponse</span>
                     <div className="font-medium text-sm line-clamp-3">
