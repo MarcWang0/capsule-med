@@ -218,31 +218,40 @@ const DocumentLearning: React.FC = () => {
 
   // --- AI LOGIC ---
 
+  const extractJson = (text: string) => {
+    try {
+      const match = text.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+      return match ? match[0] : text;
+    } catch (e) {
+      return text;
+    }
+  };
+
   const callGemini = async (prompt: string, jsonMode: boolean = false): Promise<string> => {
     if (!pdfText) {
-        throw new Error("Aucun texte extrait du PDF. L'IA ne peut pas répondre.");
+        throw new Error("Aucun texte extrait du PDF.");
     }
     
+    if (!process.env.API_KEY) {
+        throw new Error("Clé API Gemini absente.");
+    }
+
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const modelId = 'gemini-3-flash-preview';
     const contextText = pdfText.length > 500000 ? pdfText.substring(0, 500000) + "...(tronqué)" : pdfText;
 
     const fullPrompt = `CONTEXTE (Cours PDF) :\n${contextText}\n\nTACHE :\n${prompt}`;
-    const config: any = {};
-    if (jsonMode) config.responseMimeType = "application/json";
-
+    
     const response = await ai.models.generateContent({
-      model: modelId,
-      contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
-      config: config
+      model: 'gemini-3-flash-preview',
+      contents: fullPrompt,
+      config: jsonMode ? { 
+        responseMimeType: "application/json",
+        temperature: 0.1 
+      } : { temperature: 0.7 }
     });
 
-    let text = response.text || "";
-
-    if (jsonMode) {
-        text = text.replace(/```json/g, '').replace(/```/g, '').trim();
-    }
-
+    const text = response.text;
+    if (!text) throw new Error("Réponse IA vide.");
     return text;
   };
 
@@ -250,7 +259,7 @@ const DocumentLearning: React.FC = () => {
     if (!chatInput.trim()) return;
     
     if (!pdfText) {
-        alert("L'IA n'a pas accès au texte du PDF (PDF image ou protégé).");
+        alert("L'IA n'a pas accès au texte du PDF.");
         return;
     }
 
@@ -281,24 +290,7 @@ const DocumentLearning: React.FC = () => {
       const res = await callGemini(`
         Agis comme un excellent professeur de médecine.
         Ton but est d'EXPLIQUER ce cours de manière pédagogique, claire et engageante.
-        Ne fais pas un simple résumé robotique. Parle à l'étudiant.
-        
-        Structure ta réponse ainsi :
-        # 🎓 Comprendre le cours : [Titre du sujet]
-        
-        ## 💡 L'idée générale
-        [Explique le concept global simplement en 2-3 phrases, sans jargon inutile]
-        
-        ## 🔑 Les concepts clés à maîtriser
-        [Détaille les points importants. Utilise des listes à puces. Aère bien le texte.]
-        
-        ## ⚠️ Attention aux pièges
-        [Ce qu'il ne faut pas confondre, les erreurs classiques]
-        
-        ## 📝 En conclusion
-        [Un petit mot de la fin pour fixer les idées]
-
-        IMPORTANT : Aère au maximum ton texte. Fais des paragraphes courts. Utilise le gras pour mettre en valeur les termes importants.
+        Structure ta réponse avec des titres H1 et H2, des listes à puces et du gras.
       `);
       setSummary(res);
     } catch (e: any) {
@@ -313,15 +305,10 @@ const DocumentLearning: React.FC = () => {
     try {
       const res = await callGemini(`
         Génère 8 à 10 flashcards pertinentes pour réviser ce cours.
-        
-        Consignes :
-        1. Questions courtes et directes.
-        2. Réponses précises.
-        3. Utilise le Markdown pour mettre en gras les mots clés dans la réponse (ex: **Mot Clé**).
-        
         Retourne UNIQUEMENT un tableau JSON brut avec ce format : [{"front": "Question", "back": "Réponse"}].
       `, true);
-      setFlashcards(JSON.parse(res));
+      const jsonStr = extractJson(res);
+      setFlashcards(JSON.parse(jsonStr));
     } catch (e: any) { 
         console.error(e); 
         alert(`Erreur: ${e.message}`);
@@ -332,7 +319,8 @@ const DocumentLearning: React.FC = () => {
     setIsLoadingAI(true);
     try {
       const res = await callGemini(`Génère un QCM de 5 questions difficiles basées sur le cours. Retourne UNIQUEMENT un JSON brut avec ce format exact : {"capsuleId": 999, "questions": [{"id": 1, "question": "...", "options": [{"id": 1, "text": "...", "isCorrect": boolean}], "explanation": "..."}]}`, true);
-      setGeneratedQuiz(JSON.parse(res));
+      const jsonStr = extractJson(res);
+      setGeneratedQuiz(JSON.parse(jsonStr));
     } catch (e: any) { 
         console.error(e); 
         alert(`Erreur: ${e.message}`);
@@ -682,7 +670,6 @@ const ToolTab = ({active, onClick, icon, label}: any) => (
     </button>
 );
 
-// Fixed: Added React.FC type to handle key prop correctly in parent map
 const FlashcardItem: React.FC<{card: Flashcard}> = ({card}) => {
     const [flipped, setFlipped] = useState(false);
     return (

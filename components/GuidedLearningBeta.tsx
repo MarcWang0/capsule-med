@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { GoogleGenAI } from "@google/genai";
-import { ArrowLeft, Send, BrainCircuit, Loader2, Sparkles, ZoomIn, ZoomOut, Move, Wand2, Bot, ChevronDown, ChevronUp, Dna, Activity, Zap, CircleDashed, Atom } from 'lucide-react';
+import { ArrowLeft, Send, BrainCircuit, Loader2, Sparkles, ZoomIn, ZoomOut, Move, Wand2, Bot, ChevronDown, ChevronUp, Dna, Activity, Zap, CircleDashed, Atom, AlertCircle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 const MAX_DEPTH = 3; 
@@ -24,6 +24,7 @@ interface GuidedLearningBetaProps {
 
 const GuidedLearningBeta: React.FC<GuidedLearningBetaProps> = ({ initialFile, initialText, onBack }) => {
   const [step, setStep] = useState<'init' | 'loading' | 'workspace'>('init');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [pdfText] = useState(initialText || '');
   const [mindMap, setMindMap] = useState<MindMapNode | null>(null);
   const [chatMessages, setChatMessages] = useState<{role: 'user'|'model', text: string}[]>([]);
@@ -40,22 +41,47 @@ const GuidedLearningBeta: React.FC<GuidedLearningBetaProps> = ({ initialFile, in
     if (initialFile || initialText) handleStart();
   }, []);
 
+  // Utilitaire pour extraire proprement le JSON
+  const extractJson = (text: string) => {
+    try {
+      const match = text.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+      return match ? match[0] : text;
+    } catch (e) {
+      return text;
+    }
+  };
+
   const callGemini = async (prompt: string, jsonMode: boolean = false): Promise<string> => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      config: jsonMode ? { 
-        responseMimeType: "application/json",
-        temperature: 0.1 
-      } : { temperature: 0.7 }
-    });
-    return response.text || "";
+    try {
+      if (!process.env.API_KEY) {
+        throw new Error("Clé API manquante dans l'environnement.");
+      }
+      
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: prompt,
+        config: jsonMode ? { 
+          responseMimeType: "application/json",
+          temperature: 0.1 
+        } : { temperature: 0.7 }
+      });
+      
+      const text = response.text;
+      if (!text) {
+        throw new Error("Le modèle a retourné une réponse vide.");
+      }
+      return text;
+    } catch (error: any) {
+      console.error("Gemini Error:", error);
+      throw error;
+    }
   };
 
   const handleStart = async () => {
     if (!pdfText) return;
     setStep('loading');
+    setErrorMsg(null);
     try {
         const prompt = `Analyse ce cours de médecine. Génère un titre principal court et 5 chapitres majeurs.
         IMPORTANT: 'label' (max 4 mots), 'description' (explication détaillée).
@@ -63,17 +89,17 @@ const GuidedLearningBeta: React.FC<GuidedLearningBetaProps> = ({ initialFile, in
         FORMAT JSON : { "id": "root", "label": "Titre", "description": "...", "children": [{"id": "c1", "label": "Chapitre", "description": "..."}] }`;
 
         const res = await callGemini(prompt, true);
-        if (!res) throw new Error("Réponse IA vide");
-        
-        const data = JSON.parse(res.replace(/```json/g, '').replace(/```/g, '').trim());
+        const jsonStr = extractJson(res);
+        const data = JSON.parse(jsonStr);
         
         const initialMap = { ...data, isExpanded: true, isLoaded: true };
         setMindMap(initialMap);
         setStep('workspace');
 
         initialMap.children?.forEach((child: any) => prefetchNode(child.id, child.label, 1));
-    } catch (error) {
+    } catch (error: any) {
         console.error(error);
+        setErrorMsg(error.message || "Impossible de générer la Mind Map.");
         setStep('init');
     }
   };
@@ -88,9 +114,8 @@ const GuidedLearningBeta: React.FC<GuidedLearningBetaProps> = ({ initialFile, in
         FORMAT JSON : [{"id": "${nodeId}_pre", "label": "...", "description": "..."}]`;
 
         const res = await callGemini(prompt, true);
-        if (!res) return;
-
-        const children = JSON.parse(res.replace(/```json/g, '').replace(/```/g, '').trim());
+        const jsonStr = extractJson(res);
+        const children = JSON.parse(jsonStr);
         
         setMindMap(prev => {
             if (!prev) return null;
@@ -188,8 +213,8 @@ const GuidedLearningBeta: React.FC<GuidedLearningBetaProps> = ({ initialFile, in
     try {
         const res = await callGemini(`Tuteur médecine. Question: ${text}`);
         setChatMessages(prev => [...prev, { role: 'model', text: res || "Désolé, je n'ai pas pu obtenir de réponse." }]);
-    } catch (e) {
-        setChatMessages(prev => [...prev, { role: 'model', text: "Erreur lors de la communication avec l'IA." }]);
+    } catch (e: any) {
+        setChatMessages(prev => [...prev, { role: 'model', text: `Erreur IA : ${e.message || "Échec de connexion"}` }]);
     } finally {
         setIsLoadingChat(false);
     }
@@ -214,6 +239,15 @@ const GuidedLearningBeta: React.FC<GuidedLearningBetaProps> = ({ initialFile, in
                 <Dna className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-indigo-400 animate-pulse" size={24}/>
             </div>
             <p className="text-slate-500 font-black animate-pulse uppercase tracking-widest text-xs mt-8 text-center px-6">Analyse structurelle et préparation du focus...</p>
+        </div>
+      ) : step === 'init' && errorMsg ? (
+        <div className="flex-1 flex flex-col items-center justify-center bg-white p-8">
+            <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mb-4">
+                <AlertCircle size={32} />
+            </div>
+            <h3 className="text-xl font-bold text-slate-800 mb-2">Erreur de communication IA</h3>
+            <p className="text-slate-500 text-center max-w-md mb-6">{errorMsg}</p>
+            <button onClick={handleStart} className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold shadow-lg hover:bg-indigo-700">Réessayer</button>
         </div>
       ) : (
         <div className="flex-1 flex overflow-hidden">

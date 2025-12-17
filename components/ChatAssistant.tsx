@@ -45,6 +45,10 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ currentCapsule, onClose }
     setIsLoading(true);
 
     try {
+      if (!process.env.API_KEY) {
+        throw new Error("Clé API manquante.");
+      }
+      
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       
       const context = `
@@ -55,28 +59,21 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ currentCapsule, onClose }
         
         Ta mission :
         1. Répondre aux questions de l'étudiant de manière concise, pédagogique et encourageante.
-        2. Si la question porte sur le cours, donne une explication claire adaptée à un étudiant de première année de médecine (PASS/LAS).
-        3. Si la question n'a rien à voir avec la médecine ou le cours, ramène gentiment le sujet au cours.
-        4. Sois bienveillant et motivant.
-        5. Utilise le Markdown pour structurer ta réponse (gras pour les mots clés, listes à puces pour les étapes).
+        2. Expliquer les concepts simplement pour un étudiant de première année de médecine (PASS/LAS).
+        3. Utilise le Markdown pour structurer ta réponse.
       `;
 
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: [
-            { 
-              role: 'user', 
-              parts: [{ text: `${context}\n\nQuestion de l'étudiant: ${userMessage}` }] 
-            }
-        ],
+        contents: `${context}\n\nQuestion de l'étudiant: ${userMessage}`,
       });
 
       const responseText = response.text || "Désolé, je n'ai pas pu générer de réponse précise.";
       setMessages(prev => [...prev, { role: 'model', text: responseText }]);
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erreur Gemini:", error);
-      setMessages(prev => [...prev, { role: 'model', text: "Une erreur est survenue lors de la communication avec Dr. Gemini." }]);
+      setMessages(prev => [...prev, { role: 'model', text: `Une erreur est survenue : ${error.message || "Échec de connexion"}` }]);
     } finally {
       setIsLoading(false);
     }
