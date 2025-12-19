@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { GoogleGenAI } from "@google/genai";
-import { ArrowLeft, Send, BrainCircuit, Loader2, Sparkles, ZoomIn, ZoomOut, Move, Wand2, Bot, ChevronDown, ChevronUp, Dna, Activity, Zap, CircleDashed, Atom, AlertCircle, ChevronRight, MessageSquare, Settings2, LayoutList, Info, X, ChevronLeft, Play, RotateCcw, FileText, MessagesSquare, Layout } from 'lucide-react';
+import { ArrowLeft, Send, BrainCircuit, Loader2, Sparkles, ZoomIn, ZoomOut, Move, Wand2, Bot, ChevronDown, ChevronUp, Dna, Activity, Zap, CircleDashed, Atom, AlertCircle, ChevronRight, MessageSquare, Settings2, LayoutList, Info, X, ChevronLeft, Play, RotateCcw, FileText, MessagesSquare, Layout, BookOpen, Layers } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import * as pdfjsLib from 'pdfjs-dist';
 
-// Configuration du worker PDF
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
 const MAX_DEPTH = 3; 
@@ -33,11 +32,11 @@ const GuidedLearningBeta: React.FC<GuidedLearningBetaProps> = ({ initialFile, in
   const [chatInput, setChatInput] = useState('');
   const [isLoadingChat, setIsLoadingChat] = useState(false);
   
-  // Responsive Detection
+  // Responsive et Navigation Mobile
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  const [isChatOpen, setIsChatOpen] = useState(window.innerWidth >= 768);
+  const [mobilePhase, setMobilePhase] = useState<'overview' | 'learning'>('overview');
+  const [isChatOpen, setIsChatOpen] = useState(false); // Fermé par défaut sur mobile
   const [rightSideMode, setRightSideMode] = useState<'ai' | 'pdf'>('ai');
-  const [autoCloseSiblings, setAutoCloseSiblings] = useState(true);
   
   // PDF State
   const [pdfDoc, setPdfDoc] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
@@ -46,26 +45,27 @@ const GuidedLearningBeta: React.FC<GuidedLearningBetaProps> = ({ initialFile, in
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const renderTaskRef = useRef<any>(null);
 
-  // Navigation Tour State
+  // Tour State
   const [tourIndex, setTourIndex] = useState(0);
-  const [isOffTrack, setIsOffTrack] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
   
-  // Map Navigation State
+  // Desktop Map State
   const [scale, setScale] = useState(1.1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
-  
   const viewportRef = useRef<HTMLDivElement>(null);
   const mapContentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    const handleResize = () => {
+        const mobile = window.innerWidth < 768;
+        setIsMobile(mobile);
+        if (!mobile) setIsChatOpen(true); // Toujours ouvert sur PC
+    };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Load PDF document
   useEffect(() => {
     if (initialFile) {
       const load = async () => {
@@ -79,38 +79,30 @@ const GuidedLearningBeta: React.FC<GuidedLearningBetaProps> = ({ initialFile, in
     }
   }, [initialFile]);
 
-  // Render PDF page
   useEffect(() => {
     const render = async () => {
       if (!pdfDoc || !canvasRef.current || rightSideMode !== 'pdf') return;
-      
       if (renderTaskRef.current) renderTaskRef.current.cancel();
-
       const page = await pdfDoc.getPage(pdfPage);
       const canvas = canvasRef.current;
       const context = canvas.getContext('2d');
       if (!context) return;
-
       const viewport = page.getViewport({ scale: 1.5 });
       const outputScale = window.devicePixelRatio || 1;
-
       canvas.width = Math.floor(viewport.width * outputScale);
       canvas.height = Math.floor(viewport.height * outputScale);
       canvas.style.width = "100%";
-      canvas.style.height = "auto";
-
       const renderContext = {
         canvasContext: context,
         transform: outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : null,
         viewport: viewport,
       };
-
       const task = page.render(renderContext as any);
       renderTaskRef.current = task;
       try { await task.promise; } catch (e) {}
     };
     render();
-  }, [pdfDoc, pdfPage, rightSideMode]);
+  }, [pdfDoc, pdfPage, rightSideMode, isChatOpen]);
 
   const tourSequence = useMemo(() => {
     if (!mindMap) return [];
@@ -131,11 +123,7 @@ const GuidedLearningBeta: React.FC<GuidedLearningBetaProps> = ({ initialFile, in
     return sequence;
   }, [mindMap]);
 
-  useEffect(() => {
-    if (initialText) handleStart();
-  }, [initialText]);
-
-  const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+  useEffect(() => { if (initialText) handleStart(); }, [initialText]);
 
   const extractJson = (text: string) => {
     try {
@@ -144,33 +132,22 @@ const GuidedLearningBeta: React.FC<GuidedLearningBetaProps> = ({ initialFile, in
     } catch (e) { return text; }
   };
 
-  const callGemini = async (prompt: string, jsonMode: boolean = false, retries = 3, delay = 2000): Promise<string> => {
-    try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: prompt,
-        config: jsonMode ? { 
-          responseMimeType: "application/json",
-          temperature: 0.1 
-        } : { temperature: 0.7 }
-      });
-      return response.text || "";
-    } catch (error: any) {
-      if (retries > 0 && (error.status === 429 || error.message?.includes('429'))) {
-        await sleep(delay);
-        return callGemini(prompt, jsonMode, retries - 1, delay * 2);
-      }
-      throw error;
-    }
+  const callGemini = async (prompt: string, jsonMode: boolean = false): Promise<string> => {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: prompt,
+      config: jsonMode ? { responseMimeType: "application/json", temperature: 0.1 } : { temperature: 0.7 }
+    });
+    return response.text || "";
   };
 
   const prefetchChildren = async (nodeId: string, label: string, level: number) => {
     if (level >= MAX_DEPTH) return;
     try {
         const prompt = `Contexte médical : ${initialText?.substring(0, 5000)}. 
-        Approfondis le concept "${label}" avec 3 sous-points précis et techniques pour un étudiant en médecine. 
-        FORMAT JSON : { "children": [{"id": "${nodeId}-child-${Date.now()}-${Math.random()}", "label": "...", "description": "...", "isLoaded": false}] }`;
+        Approfondis "${label}" avec 3 points précis. 
+        FORMAT JSON : { "children": [{"id": "${nodeId}-${Date.now()}", "label": "...", "description": "...", "isLoaded": false}] }`;
         const res = await callGemini(prompt, true);
         const data = JSON.parse(extractJson(res));
         setMindMap(prev => {
@@ -182,32 +159,19 @@ const GuidedLearningBeta: React.FC<GuidedLearningBetaProps> = ({ initialFile, in
             };
             return updateRecursive(prev);
         });
-    } catch (e) {
-        setMindMap(prev => {
-            if (!prev) return null;
-            const updateRecursive = (current: MindMapNode): MindMapNode => {
-                if (current.id === nodeId) return { ...current, isLoading: false, isLoaded: false };
-                if (current.children) return { ...current, children: current.children.map(updateRecursive) };
-                return current;
-            };
-            return updateRecursive(prev);
-        });
-    }
+    } catch (e) {}
   };
 
   const handleStart = async () => {
     if (!initialText) return;
     setStep('loading');
     try {
-        const prompt = `Analyse ce cours de médecine. Génère un titre principal court et les 4 ou 5 chapitres majeurs. TEXTE : ${initialText.substring(0, 80000)} FORMAT JSON : { "id": "root", "label": "Titre", "description": "Résumé global", "children": [{"id": "c1", "label": "Chapitre 1", "description": "Résumé court"}] }`;
+        const prompt = `Analyse ce cours. Génère un titre court et 4 chapitres majeurs. FORMAT JSON : { "id": "root", "label": "Titre", "description": "Résumé", "children": [{"id": "c1", "label": "C1", "description": "Res"}] }`;
         const res = await callGemini(prompt, true);
         const data = JSON.parse(extractJson(res));
-        const initialMap = { ...data, isExpanded: true, isLoaded: true };
-        setMindMap(initialMap);
+        setMindMap({ ...data, isExpanded: true, isLoaded: true });
         setStep('workspace');
-        if (initialMap.children) {
-            initialMap.children.forEach((child: any) => prefetchChildren(child.id, child.label, 1));
-        }
+        if (data.children) data.children.forEach((child: any) => prefetchChildren(child.id, child.label, 1));
     } catch (error: any) { setStep('init'); }
   };
 
@@ -246,93 +210,127 @@ const GuidedLearningBeta: React.FC<GuidedLearningBetaProps> = ({ initialFile, in
     const target = tourSequence[index];
     setIsNavigating(true);
     setTourIndex(index);
-    setIsOffTrack(false);
+    if (isMobile) setMobilePhase('learning');
+    
     setMindMap(prev => {
         if (!prev) return null;
         const updateRecursive = (current: MindMapNode): MindMapNode => {
             if (current.id === target.id) {
-                if (current.children) {
-                    current.children.forEach(child => {
-                        if (!child.isLoaded && !child.isLoading) prefetchChildren(child.id, child.label, target.level + 1);
-                    });
-                }
+                if (current.children) current.children.forEach(c => { if(!c.isLoaded) prefetchChildren(c.id, c.label, index); });
                 return { ...current, isExpanded: target.phase === 'deep', isDescriptionOpen: true };
             }
             if (current.children) {
-                return { ...current, children: current.children.map(updateRecursive) };
+                const contains = (n: MindMapNode): boolean => n.id === target.id || (n.children?.some(contains) ?? false);
+                return { ...current, isExpanded: contains(current) ? true : current.isExpanded, children: current.children.map(updateRecursive) };
             }
             return current;
         };
         return updateRecursive(prev);
     });
-    if (!isMobile) setTimeout(() => { focusOnNode(target.id, 1.25); setIsNavigating(false); }, 450);
-    else setIsNavigating(false);
+    
+    if (!isMobile) {
+        setTimeout(() => { focusOnNode(target.id, 1.2); setIsNavigating(false); }, 450);
+    } else {
+        setIsNavigating(false);
+    }
   };
 
-  const handleSendMessage = async (customMessage?: string) => {
-    const text = customMessage || chatInput;
-    if (!text.trim() || isLoadingChat) return;
-    setChatMessages(prev => [...prev, { role: 'user', text }]);
+  const handleSendMessage = async (text?: string) => {
+    const msg = text || chatInput;
+    if (!msg.trim() || isLoadingChat) return;
+    setChatMessages(prev => [...prev, { role: 'user', text: msg }]);
     setChatInput('');
     setIsLoadingChat(true);
     try {
-        const context = `Tuteur médical expert. Focus sur le concept "${tourSequence[tourIndex]?.label}" extrait du cours PDF.`;
-        const res = await callGemini(`${context} Question : ${text}`);
+        const res = await callGemini(`Tuteur médical. Concept: "${tourSequence[tourIndex]?.label}". Question: ${msg}`);
         setChatMessages(prev => [...prev, { role: 'model', text: res }]);
-    } catch (e: any) {
-        setChatMessages(prev => [...prev, { role: 'model', text: "Erreur IA." }]);
-    } finally { setIsLoadingChat(false); }
+    } catch (e) { setChatMessages(prev => [...prev, { role: 'model', text: "Erreur IA." }]); }
+    finally { setIsLoadingChat(false); }
   };
 
-  const renderMobileContent = () => {
-    if (!mindMap) return null;
-    const currentStep = tourSequence[tourIndex];
-    const currentNode = findNodeById(mindMap, currentStep?.id);
-    if (!currentNode) return null;
+  // --- MOBILE VIEW COMPONENTS ---
+  
+  const MobileOverview = () => (
+    <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-32 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="bg-indigo-600 rounded-2xl p-6 text-white mb-6 shadow-lg">
+            <h2 className="text-xl font-black mb-2 flex items-center gap-2">
+                <BookOpen size={24}/> Sommaire du Cours
+            </h2>
+            <p className="text-indigo-100 text-xs leading-relaxed opacity-90">{mindMap?.description}</p>
+        </div>
+
+        {mindMap?.children?.map((chapter, idx) => (
+            <div key={chapter.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <details className="group">
+                    <summary className="p-4 flex items-center justify-between cursor-pointer list-none">
+                        <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-black text-slate-500">{idx + 1}</div>
+                            <span className="font-bold text-slate-800 text-sm">{chapter.label}</span>
+                        </div>
+                        <ChevronDown size={18} className="text-slate-400 group-open:rotate-180 transition-transform" />
+                    </summary>
+                    <div className="px-4 pb-4 animate-in slide-in-from-top-2">
+                        <p className="text-xs text-slate-500 leading-relaxed italic mb-4">{chapter.description}</p>
+                        <button 
+                            onClick={() => goToTourStep(tourSequence.findIndex(s => s.id === chapter.id))}
+                            className="w-full py-3 bg-indigo-50 text-indigo-600 rounded-xl text-xs font-bold flex items-center justify-center gap-2 active:scale-95 transition-all"
+                        >
+                            <Play size={14} fill="currentColor"/> Étudier ce chapitre
+                        </button>
+                    </div>
+                </details>
+            </div>
+        ))}
+    </div>
+  );
+
+  const MobileCardView = () => {
+    const currentNode = findNodeById(mindMap!, tourSequence[tourIndex].id);
+    const isNewChapter = tourSequence[tourIndex].level === 1 && tourSequence[tourIndex].phase === 'plan';
 
     return (
-      <div className="flex-1 flex flex-col p-5 md:p-8 animate-in fade-in zoom-in duration-500 overflow-y-auto pb-32">
-        <div className="flex flex-col items-center gap-6">
-            <div className={`w-full bg-white rounded-3xl shadow-2xl border-2 p-6 md:p-8 flex flex-col gap-5 ${currentStep.level === 0 ? 'border-indigo-500' : 'border-emerald-400'}`}>
-                <div className="flex flex-col gap-2">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600 opacity-60">
-                        {currentStep.phase === 'plan' ? 'Survol Global' : 'Immersion Détails'}
-                    </span>
-                    <h3 className="text-xl font-black text-slate-900 leading-tight">
-                        {currentNode.label}
-                    </h3>
-                </div>
-                
-                <div className="h-px bg-slate-100 w-full" />
+        <div className="flex-1 flex flex-col p-6 animate-in fade-in zoom-in duration-500 relative pb-32">
+            {isNewChapter && (
+                <div className="absolute inset-x-0 top-0 bg-indigo-600 h-1 z-0 shadow-lg shadow-indigo-100" />
+            )}
+            <div className="flex-1 flex flex-col items-center justify-center">
+                <div className={`w-full bg-white rounded-3xl shadow-2xl border-2 p-8 flex flex-col gap-6 transform transition-all ${tourSequence[tourIndex].level === 0 ? 'border-indigo-500' : 'border-emerald-400'}`}>
+                    <div className="flex flex-col gap-2">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600 opacity-60">
+                            {tourSequence[tourIndex].phase === 'plan' ? 'Plan de Survol' : 'Détails & Immersion'}
+                        </span>
+                        <h3 className="text-2xl font-black text-slate-900 leading-tight">{currentNode?.label}</h3>
+                    </div>
+                    
+                    <div className="h-px bg-slate-100 w-full" />
 
-                <div className="text-slate-600 text-sm leading-relaxed prose prose-sm max-w-none">
-                    <ReactMarkdown>{currentNode.description || "Contenu en cours de génération..."}</ReactMarkdown>
-                </div>
+                    <div className="text-slate-600 text-sm leading-relaxed max-h-[35vh] overflow-y-auto pr-2">
+                        <ReactMarkdown>{currentNode?.description || "Chargement..."}</ReactMarkdown>
+                    </div>
 
-                <button 
-                    onClick={() => { setIsChatOpen(true); setRightSideMode('ai'); handleSendMessage(`Explique-moi ce concept : ${currentNode.label}`); }}
-                    className="w-full py-4 bg-indigo-50 text-indigo-600 rounded-2xl text-xs font-bold flex items-center justify-center gap-3 active:scale-95 transition-all shadow-sm"
-                >
-                    <Bot size={18}/> Approfondir avec l'IA
-                </button>
+                    <button 
+                        onClick={() => { setIsChatOpen(true); setRightSideMode('ai'); handleSendMessage(`Dis-m'en plus sur : ${currentNode?.label}`); }}
+                        className="w-full py-4 bg-indigo-50 text-indigo-600 rounded-2xl text-xs font-bold flex items-center justify-center gap-3 active:scale-95 transition-all"
+                    >
+                        <Bot size={18}/> Approfondir avec Dr. Gemini
+                    </button>
+                </div>
             </div>
         </div>
-      </div>
     );
   };
 
   return (
     <div className="flex-1 flex flex-col h-full bg-[#f8fafc] overflow-hidden select-none">
+      {/* HEADER FIXE */}
       <header className="h-14 border-b border-slate-200 bg-white flex items-center justify-between px-4 shrink-0 z-[60]">
-        <div className="flex items-center gap-3">
-            <button onClick={onBack} className="p-2 hover:bg-slate-100 rounded-xl text-slate-500"><ArrowLeft size={20}/></button>
-            <span className="font-bold text-slate-900 text-sm">Guided Path Beta</span>
-        </div>
+        <button onClick={onBack} className="p-2 hover:bg-slate-100 rounded-xl text-slate-500"><ArrowLeft size={20}/></button>
+        <span className="font-bold text-slate-900 text-sm">Guided Pathfinder</span>
         <button 
             onClick={() => setIsChatOpen(!isChatOpen)} 
             className={`p-2 rounded-xl transition-all ${isChatOpen ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-indigo-600'}`}
         >
-            {isChatOpen ? <X size={20}/> : <Bot size={20}/>}
+            {isChatOpen ? <X size={20}/> : <Sparkles size={20}/>}
         </button>
       </header>
 
@@ -340,13 +338,16 @@ const GuidedLearningBeta: React.FC<GuidedLearningBetaProps> = ({ initialFile, in
         {step === 'loading' ? (
             <div className="flex-1 flex flex-col items-center justify-center bg-white z-50">
                 <CircleDashed className="animate-spin text-indigo-600" size={48} />
-                <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mt-6">Analyse...</p>
+                <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mt-6">Analyse du PDF...</p>
             </div>
         ) : (
             <div className="flex-1 relative flex flex-col overflow-hidden bg-slate-50">
+                
+                {/* --- RENDERER CONDITIONNEL --- */}
                 {isMobile ? (
-                    renderMobileContent()
+                    mobilePhase === 'overview' ? <MobileOverview /> : <MobileCardView />
                 ) : (
+                    /* DESKTOP MIND MAP (INCHANGÉ) */
                     <div 
                         ref={viewportRef}
                         className="flex-1 relative overflow-hidden bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:40px_40px] cursor-grab active:cursor-grabbing"
@@ -382,28 +383,46 @@ const GuidedLearningBeta: React.FC<GuidedLearningBetaProps> = ({ initialFile, in
                     </div>
                 )}
 
-                {/* BARRE DE NAVIGATION COMMUNE (ADAPTÉE) */}
+                {/* BARRE DE NAVIGATION (Bas de l'écran) */}
                 <div className="absolute bottom-6 left-0 right-0 px-4 z-50">
                    <div className="bg-white/95 backdrop-blur-xl border border-slate-200 p-3 rounded-2xl shadow-2xl flex items-center gap-3 max-w-lg mx-auto overflow-hidden">
-                        <button onClick={() => goToTourStep(tourIndex - 1)} disabled={tourIndex === 0} className="p-3 bg-slate-100 rounded-xl disabled:opacity-30"><ChevronLeft size={20}/></button>
+                        
+                        {/* Mobile : Bouton Retour Sommaire | PC : Bouton Précédent */}
+                        {isMobile && mobilePhase === 'learning' ? (
+                            <button onClick={() => setMobilePhase('overview')} className="p-3 bg-slate-100 rounded-xl text-slate-500 active:bg-slate-200">
+                                <LayoutList size={20}/>
+                            </button>
+                        ) : (
+                            <button onClick={() => goToTourStep(tourIndex - 1)} disabled={tourIndex === 0} className="p-3 bg-slate-100 rounded-xl disabled:opacity-30"><ChevronLeft size={20}/></button>
+                        )}
                         
                         <div className="flex-1 flex flex-col items-center min-w-0">
                             <span className="text-[9px] font-black uppercase text-indigo-600 truncate w-full text-center tracking-widest">
-                                Étape {tourIndex + 1} / {tourSequence.length}
+                                {tourIndex + 1} / {tourSequence.length} • {tourSequence[tourIndex]?.phase === 'plan' ? 'Survol' : 'Détails'}
                             </span>
                             <span className="text-[12px] font-bold text-slate-800 truncate w-full text-center">
                                 {tourSequence[tourIndex]?.label}
                             </span>
                         </div>
 
-                        <button 
-                            onClick={() => goToTourStep(tourIndex + 1)} 
-                            disabled={tourIndex >= tourSequence.length - 1}
-                            className="bg-indigo-600 text-white px-5 py-3 rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg active:scale-95 transition-all"
-                        >
-                            {isNavigating ? <Loader2 size={16} className="animate-spin"/> : <Sparkles size={16}/>}
-                            <span>Suivant</span>
-                        </button>
+                        {/* Bouton Suivant | Reprendre */}
+                        {isMobile && mobilePhase === 'overview' && tourIndex > 0 ? (
+                            <button 
+                                onClick={() => setMobilePhase('learning')}
+                                className="bg-emerald-600 text-white px-5 py-3 rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg active:scale-95"
+                            >
+                                <RotateCcw size={16}/> Reprendre
+                            </button>
+                        ) : (
+                            <button 
+                                onClick={() => goToTourStep(tourIndex + 1)} 
+                                disabled={tourIndex >= tourSequence.length - 1}
+                                className="bg-indigo-600 text-white px-5 py-3 rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg active:scale-95 transition-all"
+                            >
+                                {isNavigating ? <Loader2 size={16} className="animate-spin"/> : <Sparkles size={16}/>}
+                                <span>Suivant</span>
+                            </button>
+                        )}
                    </div>
                 </div>
 
@@ -416,53 +435,76 @@ const GuidedLearningBeta: React.FC<GuidedLearningBetaProps> = ({ initialFile, in
             </div>
         )}
 
-        {/* SIDEBAR IA/PDF RESPONSIVE */}
-        <div className={`bg-white md:border-l border-slate-200 flex flex-col shadow-2xl z-[80] transition-all duration-300 ${isChatOpen ? 'fixed inset-0 top-14 md:relative md:top-0 md:w-[400px]' : 'w-0 overflow-hidden'}`}>
-            <div className="flex bg-slate-50 border-b border-slate-100 shrink-0">
-                <button onClick={() => setRightSideMode('ai')} className={`flex-1 py-3 text-xs font-bold border-b-2 ${rightSideMode === 'ai' ? 'text-indigo-600 border-indigo-600 bg-white' : 'text-slate-400 border-transparent'}`}>Assistant</button>
-                <button onClick={() => setRightSideMode('pdf')} className={`flex-1 py-3 text-xs font-bold border-b-2 ${rightSideMode === 'pdf' ? 'text-indigo-600 border-indigo-600 bg-white' : 'text-slate-400 border-transparent'}`}>Document PDF</button>
-            </div>
+        {/* --- ATELIER / CHATBOT (FULL SCREEN OVERLAY SUR MOBILE) --- */}
+        <div className={`bg-white shadow-2xl z-[100] transition-all duration-300 ${isChatOpen ? 'fixed inset-0 md:relative md:w-[450px] md:border-l md:border-slate-200' : 'w-0 overflow-hidden'}`}>
+            <div className="flex flex-col h-full">
+                {/* Header Atelier avec bouton de fermeture PRIORITAIRE sur mobile */}
+                <div className="flex bg-slate-50 border-b border-slate-100 shrink-0 items-center pr-2">
+                    <button onClick={() => setRightSideMode('ai')} className={`flex-1 py-4 text-xs font-bold border-b-2 ${rightSideMode === 'ai' ? 'text-indigo-600 border-indigo-600 bg-white' : 'text-slate-400 border-transparent'}`}>Assistant IA</button>
+                    <button onClick={() => setRightSideMode('pdf')} className={`flex-1 py-4 text-xs font-bold border-b-2 ${rightSideMode === 'pdf' ? 'text-indigo-600 border-indigo-600 bg-white' : 'text-slate-400 border-transparent'}`}>Source PDF</button>
+                    
+                    {isMobile && (
+                        <button 
+                            onClick={() => setIsChatOpen(false)}
+                            className="p-3 text-slate-400 hover:text-slate-600 active:scale-95 transition-all"
+                        >
+                            <X size={24} />
+                        </button>
+                    )}
+                </div>
 
-            <div className="flex-1 overflow-hidden flex flex-col bg-slate-50/30">
-                {rightSideMode === 'ai' ? (
-                    <>
-                        <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-hide">
-                            {chatMessages.map((msg, idx) => (
-                                <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                    <div className={`max-w-[90%] p-3 rounded-xl text-sm ${msg.role === 'user' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white border border-slate-200 text-slate-800 shadow-sm'}`}>
-                                        <ReactMarkdown>{msg.text}</ReactMarkdown>
+                <div className="flex-1 overflow-hidden flex flex-col bg-slate-50/30 relative">
+                    {rightSideMode === 'ai' ? (
+                        <>
+                            <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-hide pb-20">
+                                {chatMessages.map((msg, idx) => (
+                                    <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                        <div className={`max-w-[90%] p-3 rounded-xl text-sm ${msg.role === 'user' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white border border-slate-200 text-slate-800 shadow-sm'}`}>
+                                            <ReactMarkdown>{msg.text}</ReactMarkdown>
+                                        </div>
                                     </div>
+                                ))}
+                                {isLoadingChat && (
+                                    <div className="flex justify-start">
+                                        <div className="bg-white border border-slate-200 p-3 rounded-xl shadow-sm flex items-center gap-2">
+                                            <Loader2 size={14} className="animate-spin text-indigo-600"/>
+                                            <span className="text-[10px] text-slate-400 font-bold uppercase">Réflexion...</span>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="absolute bottom-0 inset-x-0 p-4 border-t border-slate-100 bg-white md:relative">
+                                <div className="relative flex gap-2">
+                                    <input value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()} placeholder="Une question ?" className="flex-1 px-4 py-3 bg-slate-100 rounded-xl outline-none text-sm font-medium" />
+                                    <button onClick={() => handleSendMessage()} className="w-12 bg-indigo-600 text-white rounded-xl flex items-center justify-center"><Send size={18}/></button>
                                 </div>
-                            ))}
-                        </div>
-                        <div className="p-4 border-t border-slate-100 bg-white mb-safe">
-                            <div className="relative flex gap-2">
-                                <input value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()} placeholder="Une question ?" className="flex-1 px-4 py-3 bg-slate-100 rounded-xl outline-none text-sm font-medium" />
-                                <button onClick={() => handleSendMessage()} className="w-12 bg-indigo-600 text-white rounded-xl flex items-center justify-center"><Send size={18}/></button>
+                            </div>
+                        </>
+                    ) : (
+                        <div className="flex-1 flex flex-col bg-slate-200">
+                            <div className="p-3 bg-white border-b border-slate-200 flex items-center justify-between">
+                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Page {pdfPage} / {pdfTotalPages}</span>
+                                <div className="flex items-center gap-2">
+                                    <button onClick={() => setPdfPage(p => Math.max(1, p - 1))} className="p-1 bg-slate-50 rounded"><ChevronLeft size={20}/></button>
+                                    <button onClick={() => setPdfPage(p => Math.min(pdfTotalPages, p + 1))} className="p-1 bg-slate-50 rounded"><ChevronRight size={20}/></button>
+                                </div>
+                            </div>
+                            <div className="flex-1 overflow-auto p-4 bg-slate-300/50 flex justify-center">
+                                <canvas ref={canvasRef} className="shadow-2xl bg-white rounded-sm h-fit max-w-full" />
                             </div>
                         </div>
-                    </>
-                ) : (
-                    <div className="flex-1 flex flex-col bg-slate-200">
-                        <div className="p-3 bg-white border-b border-slate-200 flex items-center justify-between">
-                            <span className="text-[10px] font-bold text-slate-500 uppercase">Aperçu PDF</span>
-                            <div className="flex items-center gap-2">
-                                <button onClick={() => setPdfPage(p => Math.max(1, p - 1))} className="p-1"><ChevronLeft size={16}/></button>
-                                <span className="text-[10px] font-mono">{pdfPage}/{pdfTotalPages}</span>
-                                <button onClick={() => setPdfPage(p => Math.min(pdfTotalPages, p + 1))} className="p-1"><ChevronRight size={16}/></button>
-                            </div>
-                        </div>
-                        <div className="flex-1 overflow-auto p-2 bg-slate-300/50 flex justify-center">
-                            <canvas ref={canvasRef} className="shadow-lg bg-white rounded-sm h-fit max-w-full" />
-                        </div>
-                    </div>
-                )}
+                    )}
+                </div>
             </div>
         </div>
       </div>
+
       <style>{`
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        @media (max-width: 768px) {
+            .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+        }
       `}</style>
     </div>
   );
