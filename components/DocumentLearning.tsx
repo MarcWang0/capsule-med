@@ -218,6 +218,8 @@ const DocumentLearning: React.FC = () => {
 
   // --- AI LOGIC ---
 
+  const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
   const extractJson = (text: string) => {
     try {
       const match = text.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
@@ -227,42 +229,46 @@ const DocumentLearning: React.FC = () => {
     }
   };
 
-  const callGemini = async (prompt: string, jsonMode: boolean = false): Promise<string> => {
+  const callGemini = async (prompt: string, jsonMode: boolean = false, retries = 3, delay = 2000): Promise<string> => {
     if (!pdfText) {
         throw new Error("Aucun texte extrait du PDF.");
     }
     
-    if (!process.env.API_KEY) {
+    const apiKey = process.env.API_KEY;
+    if (!apiKey || apiKey === "undefined") {
         throw new Error("Clé API Gemini absente.");
     }
 
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const contextText = pdfText.length > 500000 ? pdfText.substring(0, 500000) + "...(tronqué)" : pdfText;
+    try {
+      const ai = new GoogleGenAI({ apiKey });
+      const contextText = pdfText.length > 50000 ? pdfText.substring(0, 50000) + "...(tronqué)" : pdfText;
+      const fullPrompt = `CONTEXTE (Cours PDF) :\n${contextText}\n\nTACHE :\n${prompt}`;
+      
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: fullPrompt,
+        config: jsonMode ? { 
+          responseMimeType: "application/json",
+          temperature: 0.1 
+        } : { temperature: 0.7 }
+      });
 
-    const fullPrompt = `CONTEXTE (Cours PDF) :\n${contextText}\n\nTACHE :\n${prompt}`;
-    
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: fullPrompt,
-      config: jsonMode ? { 
-        responseMimeType: "application/json",
-        temperature: 0.1 
-      } : { temperature: 0.7 }
-    });
-
-    const text = response.text;
-    if (!text) throw new Error("Réponse IA vide.");
-    return text;
+      const text = response.text;
+      if (!text) throw new Error("Réponse IA vide.");
+      return text;
+    } catch (error: any) {
+      const isQuota = error.message?.includes('429') || error.status === 429;
+      if (isQuota && retries > 0) {
+        await sleep(delay);
+        return callGemini(prompt, jsonMode, retries - 1, delay * 2);
+      }
+      throw error;
+    }
   };
 
   const handleSendMessage = async () => {
     if (!chatInput.trim()) return;
     
-    if (!pdfText) {
-        alert("L'IA n'a pas accès au texte du PDF.");
-        return;
-    }
-
     const msg = chatInput;
     setChatInput('');
     setChatMessages(prev => [...prev, { role: 'user', text: msg }]);
@@ -277,7 +283,7 @@ const DocumentLearning: React.FC = () => {
       `);
       setChatMessages(prev => [...prev, { role: 'model', text: response }]);
     } catch (e: any) {
-      setChatMessages(prev => [...prev, { role: 'model', text: `Erreur: ${e.message || "Impossible de contacter l'IA."}` }]);
+      setChatMessages(prev => [...prev, { role: 'model', text: `Erreur IA : ${e.message?.includes('429') ? "Quota saturé, réessayez dans 1 min." : "Échec de connexion"}` }]);
     } finally {
       setIsLoadingAI(false);
     }
@@ -294,7 +300,7 @@ const DocumentLearning: React.FC = () => {
       `);
       setSummary(res);
     } catch (e: any) {
-      setSummary(`Erreur lors de la génération du résumé: ${e.message}`);
+      setSummary(`Erreur : ${e.message?.includes('429') ? "Quota dépassé." : e.message}`);
     } finally {
       setIsLoadingAI(false);
     }
@@ -311,7 +317,7 @@ const DocumentLearning: React.FC = () => {
       setFlashcards(JSON.parse(jsonStr));
     } catch (e: any) { 
         console.error(e); 
-        alert(`Erreur: ${e.message}`);
+        alert(e.message?.includes('429') ? "Le quota d'analyse est atteint. Patientez 1 min." : `Erreur: ${e.message}`);
     } finally { setIsLoadingAI(false); }
   };
 
@@ -323,7 +329,7 @@ const DocumentLearning: React.FC = () => {
       setGeneratedQuiz(JSON.parse(jsonStr));
     } catch (e: any) { 
         console.error(e); 
-        alert(`Erreur: ${e.message}`);
+        alert(e.message?.includes('429') ? "Quota saturé." : `Erreur: ${e.message}`);
     } finally { setIsLoadingAI(false); }
   };
 
