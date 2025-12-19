@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { GoogleGenAI } from "@google/genai";
-import { ArrowLeft, Send, BrainCircuit, Loader2, Sparkles, ZoomIn, ZoomOut, Move, Wand2, Bot, ChevronDown, ChevronUp, Dna, Activity, Zap, CircleDashed, Atom, AlertCircle, ChevronRight, MessageSquare, Settings2, LayoutList, Info, X, ChevronLeft, Play, RotateCcw, FileText, MessagesSquare, Layout, BookOpen, Layers } from 'lucide-react';
+// Added missing ChevronRight import
+import { ArrowLeft, Send, Loader2, Sparkles, ZoomIn, ZoomOut, Bot, ChevronDown, ChevronUp, Activity, Zap, CircleDashed, X, ChevronLeft, ChevronRight, Play, RotateCcw, BookOpen, Layers, MessageCircle, FileText, LayoutList } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import * as pdfjsLib from 'pdfjs-dist';
 
@@ -32,10 +33,11 @@ const GuidedLearningBeta: React.FC<GuidedLearningBetaProps> = ({ initialFile, in
   const [chatInput, setChatInput] = useState('');
   const [isLoadingChat, setIsLoadingChat] = useState(false);
   
-  // Responsive et Navigation Mobile
+  // Responsive et Mobile Phases
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [mobilePhase, setMobilePhase] = useState<'overview' | 'learning'>('overview');
-  const [isChatOpen, setIsChatOpen] = useState(false); // Fermé par défaut sur mobile
+  const [lastLearningIndex, setLastLearningIndex] = useState(0);
+  const [isChatOpen, setIsChatOpen] = useState(false);
   const [rightSideMode, setRightSideMode] = useState<'ai' | 'pdf'>('ai');
   
   // PDF State
@@ -45,7 +47,7 @@ const GuidedLearningBeta: React.FC<GuidedLearningBetaProps> = ({ initialFile, in
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const renderTaskRef = useRef<any>(null);
 
-  // Tour State
+  // Tour / Navigation State
   const [tourIndex, setTourIndex] = useState(0);
   const [isNavigating, setIsNavigating] = useState(false);
   
@@ -60,7 +62,7 @@ const GuidedLearningBeta: React.FC<GuidedLearningBetaProps> = ({ initialFile, in
     const handleResize = () => {
         const mobile = window.innerWidth < 768;
         setIsMobile(mobile);
-        if (!mobile) setIsChatOpen(true); // Toujours ouvert sur PC
+        if (!mobile) setIsChatOpen(true);
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
@@ -104,6 +106,7 @@ const GuidedLearningBeta: React.FC<GuidedLearningBetaProps> = ({ initialFile, in
     render();
   }, [pdfDoc, pdfPage, rightSideMode, isChatOpen]);
 
+  // Linear Tour Sequence for both Desktop Tour and Mobile Cards
   const tourSequence = useMemo(() => {
     if (!mindMap) return [];
     const sequence: {id: string, label: string, level: number, phase: 'plan' | 'deep'}[] = [];
@@ -166,7 +169,7 @@ const GuidedLearningBeta: React.FC<GuidedLearningBetaProps> = ({ initialFile, in
     if (!initialText) return;
     setStep('loading');
     try {
-        const prompt = `Analyse ce cours. Génère un titre court et 4 chapitres majeurs. FORMAT JSON : { "id": "root", "label": "Titre", "description": "Résumé", "children": [{"id": "c1", "label": "C1", "description": "Res"}] }`;
+        const prompt = `Analyse ce cours de médecine. Génère un titre court et les 4 ou 5 chapitres majeurs. FORMAT JSON : { "id": "root", "label": "Titre", "description": "Résumé global", "children": [{"id": "c1", "label": "Chapitre 1", "description": "Résumé court"}] }`;
         const res = await callGemini(prompt, true);
         const data = JSON.parse(extractJson(res));
         setMindMap({ ...data, isExpanded: true, isLoaded: true });
@@ -210,7 +213,10 @@ const GuidedLearningBeta: React.FC<GuidedLearningBetaProps> = ({ initialFile, in
     const target = tourSequence[index];
     setIsNavigating(true);
     setTourIndex(index);
-    if (isMobile) setMobilePhase('learning');
+    if (isMobile) {
+        setMobilePhase('learning');
+        setLastLearningIndex(index);
+    }
     
     setMindMap(prev => {
         if (!prev) return null;
@@ -242,75 +248,87 @@ const GuidedLearningBeta: React.FC<GuidedLearningBetaProps> = ({ initialFile, in
     setChatInput('');
     setIsLoadingChat(true);
     try {
-        const res = await callGemini(`Tuteur médical. Concept: "${tourSequence[tourIndex]?.label}". Question: ${msg}`);
+        const res = await callGemini(`Tuteur médical expert. Concept: "${tourSequence[tourIndex]?.label}". Question: ${msg}`);
         setChatMessages(prev => [...prev, { role: 'model', text: res }]);
     } catch (e) { setChatMessages(prev => [...prev, { role: 'model', text: "Erreur IA." }]); }
     finally { setIsLoadingChat(false); }
   };
 
-  // --- MOBILE VIEW COMPONENTS ---
-  
+  // --- MOBILE VIEWS ---
+
   const MobileOverview = () => (
-    <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-32 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <div className="bg-indigo-600 rounded-2xl p-6 text-white mb-6 shadow-lg">
+    <div className="flex-1 overflow-y-auto bg-slate-50 p-4 space-y-4 pb-32 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="bg-indigo-600 rounded-3xl p-6 text-white mb-6 shadow-xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-4 opacity-10">
+                <BookOpen size={80} />
+            </div>
             <h2 className="text-xl font-black mb-2 flex items-center gap-2">
-                <BookOpen size={24}/> Sommaire du Cours
+                <LayoutList size={24}/> Sommaire du Cours
             </h2>
             <p className="text-indigo-100 text-xs leading-relaxed opacity-90">{mindMap?.description}</p>
         </div>
 
-        {mindMap?.children?.map((chapter, idx) => (
-            <div key={chapter.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                <details className="group">
-                    <summary className="p-4 flex items-center justify-between cursor-pointer list-none">
-                        <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-black text-slate-500">{idx + 1}</div>
-                            <span className="font-bold text-slate-800 text-sm">{chapter.label}</span>
+        <div className="space-y-3">
+            {mindMap?.children?.map((chapter, idx) => (
+                <div key={chapter.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    <details className="group">
+                        <summary className="p-4 flex items-center justify-between cursor-pointer list-none">
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center text-[10px] font-black text-indigo-600">
+                                    {String(idx + 1).padStart(2, '0')}
+                                </div>
+                                <span className="font-bold text-slate-800 text-sm">{chapter.label}</span>
+                            </div>
+                            <ChevronDown size={18} className="text-slate-400 group-open:rotate-180 transition-transform" />
+                        </summary>
+                        <div className="px-4 pb-4 border-t border-slate-50 pt-3 animate-in slide-in-from-top-2">
+                            <p className="text-xs text-slate-500 leading-relaxed italic mb-4">{chapter.description}</p>
+                            <button 
+                                onClick={() => goToTourStep(tourSequence.findIndex(s => s.id === chapter.id))}
+                                className="w-full py-3 bg-indigo-50 text-indigo-600 rounded-xl text-xs font-bold flex items-center justify-center gap-2 active:scale-95 transition-all"
+                            >
+                                <Play size={14} fill="currentColor"/> Étudier ce chapitre
+                            </button>
                         </div>
-                        <ChevronDown size={18} className="text-slate-400 group-open:rotate-180 transition-transform" />
-                    </summary>
-                    <div className="px-4 pb-4 animate-in slide-in-from-top-2">
-                        <p className="text-xs text-slate-500 leading-relaxed italic mb-4">{chapter.description}</p>
-                        <button 
-                            onClick={() => goToTourStep(tourSequence.findIndex(s => s.id === chapter.id))}
-                            className="w-full py-3 bg-indigo-50 text-indigo-600 rounded-xl text-xs font-bold flex items-center justify-center gap-2 active:scale-95 transition-all"
-                        >
-                            <Play size={14} fill="currentColor"/> Étudier ce chapitre
-                        </button>
-                    </div>
-                </details>
-            </div>
-        ))}
+                    </details>
+                </div>
+            ))}
+        </div>
     </div>
   );
 
-  const MobileCardView = () => {
-    const currentNode = findNodeById(mindMap!, tourSequence[tourIndex].id);
-    const isNewChapter = tourSequence[tourIndex].level === 1 && tourSequence[tourIndex].phase === 'plan';
+  const MobileLearningView = () => {
+    const currentNode = findNodeById(mindMap!, tourSequence[tourIndex]?.id);
+    const isNewChapter = tourSequence[tourIndex]?.level === 1 && tourSequence[tourIndex]?.phase === 'plan';
 
     return (
-        <div className="flex-1 flex flex-col p-6 animate-in fade-in zoom-in duration-500 relative pb-32">
+        <div className="flex-1 flex flex-col p-6 animate-in fade-in zoom-in duration-500 relative pb-32 overflow-y-auto">
             {isNewChapter && (
-                <div className="absolute inset-x-0 top-0 bg-indigo-600 h-1 z-0 shadow-lg shadow-indigo-100" />
+                <div className="absolute top-10 left-1/2 -translate-x-1/2 w-40 bg-indigo-600/10 text-indigo-600 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest text-center border border-indigo-200 animate-bounce">
+                    Nouveau Chapitre
+                </div>
             )}
-            <div className="flex-1 flex flex-col items-center justify-center">
-                <div className={`w-full bg-white rounded-3xl shadow-2xl border-2 p-8 flex flex-col gap-6 transform transition-all ${tourSequence[tourIndex].level === 0 ? 'border-indigo-500' : 'border-emerald-400'}`}>
+            
+            <div className="flex-1 flex flex-col items-center justify-center gap-6 mt-12">
+                <div className={`w-full bg-white rounded-[2.5rem] shadow-2xl border-2 p-8 flex flex-col gap-6 transform transition-all active:scale-[0.98] ${tourSequence[tourIndex]?.level === 0 ? 'border-indigo-500 ring-8 ring-indigo-50' : 'border-emerald-400 ring-8 ring-emerald-50'}`}>
                     <div className="flex flex-col gap-2">
                         <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600 opacity-60">
-                            {tourSequence[tourIndex].phase === 'plan' ? 'Plan de Survol' : 'Détails & Immersion'}
+                            {tourSequence[tourIndex]?.phase === 'plan' ? 'Phase de Survol' : 'Phase d\'Immersion'}
                         </span>
-                        <h3 className="text-2xl font-black text-slate-900 leading-tight">{currentNode?.label}</h3>
+                        <h3 className="text-2xl font-black text-slate-900 leading-tight">
+                            {currentNode?.label}
+                        </h3>
                     </div>
                     
                     <div className="h-px bg-slate-100 w-full" />
 
-                    <div className="text-slate-600 text-sm leading-relaxed max-h-[35vh] overflow-y-auto pr-2">
-                        <ReactMarkdown>{currentNode?.description || "Chargement..."}</ReactMarkdown>
+                    <div className="text-slate-600 text-sm leading-relaxed max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar">
+                        <ReactMarkdown>{currentNode?.description || "Chargement des données pédagogiques..."}</ReactMarkdown>
                     </div>
 
                     <button 
                         onClick={() => { setIsChatOpen(true); setRightSideMode('ai'); handleSendMessage(`Dis-m'en plus sur : ${currentNode?.label}`); }}
-                        className="w-full py-4 bg-indigo-50 text-indigo-600 rounded-2xl text-xs font-bold flex items-center justify-center gap-3 active:scale-95 transition-all"
+                        className="w-full py-4 bg-indigo-50 text-indigo-600 rounded-2xl text-xs font-bold flex items-center justify-center gap-3 active:scale-95 transition-all shadow-sm"
                     >
                         <Bot size={18}/> Approfondir avec Dr. Gemini
                     </button>
@@ -320,34 +338,41 @@ const GuidedLearningBeta: React.FC<GuidedLearningBetaProps> = ({ initialFile, in
     );
   };
 
+  // --- RENDERING LOGIC ---
+
   return (
     <div className="flex-1 flex flex-col h-full bg-[#f8fafc] overflow-hidden select-none">
-      {/* HEADER FIXE */}
+      {/* HEADER UNIFIÉ */}
       <header className="h-14 border-b border-slate-200 bg-white flex items-center justify-between px-4 shrink-0 z-[60]">
-        <button onClick={onBack} className="p-2 hover:bg-slate-100 rounded-xl text-slate-500"><ArrowLeft size={20}/></button>
-        <span className="font-bold text-slate-900 text-sm">Guided Pathfinder</span>
-        <button 
-            onClick={() => setIsChatOpen(!isChatOpen)} 
-            className={`p-2 rounded-xl transition-all ${isChatOpen ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-indigo-600'}`}
-        >
-            {isChatOpen ? <X size={20}/> : <Sparkles size={20}/>}
-        </button>
+        <div className="flex items-center gap-2">
+            <button onClick={onBack} className="p-2 hover:bg-slate-100 rounded-xl text-slate-500"><ArrowLeft size={20}/></button>
+            <span className="font-black text-slate-900 text-sm tracking-tight">Pathfinder <span className="text-indigo-600">Guided</span></span>
+        </div>
+        
+        {/* FAB BOT DÉPLACÉ DANS LE HEADER SUR MOBILE POUR PLUS DE CLARTÉ */}
+        {isMobile && (
+            <button 
+                onClick={() => setIsChatOpen(!isChatOpen)} 
+                className={`p-2.5 rounded-xl transition-all shadow-lg active:scale-95 ${isChatOpen ? 'bg-indigo-600 text-white' : 'bg-white border border-slate-200 text-indigo-600'}`}
+            >
+                {isChatOpen ? <X size={20}/> : <Bot size={20}/>}
+            </button>
+        )}
       </header>
 
       <div className="flex-1 flex overflow-hidden relative">
         {step === 'loading' ? (
             <div className="flex-1 flex flex-col items-center justify-center bg-white z-50">
                 <CircleDashed className="animate-spin text-indigo-600" size={48} />
-                <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mt-6">Analyse du PDF...</p>
+                <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mt-6">Analyse structurée en cours...</p>
             </div>
         ) : (
             <div className="flex-1 relative flex flex-col overflow-hidden bg-slate-50">
                 
-                {/* --- RENDERER CONDITIONNEL --- */}
+                {/* --- SEPARATION STRICTE MOBILE / DESKTOP --- */}
                 {isMobile ? (
-                    mobilePhase === 'overview' ? <MobileOverview /> : <MobileCardView />
+                    mobilePhase === 'overview' ? <MobileOverview /> : <MobileLearningView />
                 ) : (
-                    /* DESKTOP MIND MAP (INCHANGÉ) */
                     <div 
                         ref={viewportRef}
                         className="flex-1 relative overflow-hidden bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:40px_40px] cursor-grab active:cursor-grabbing"
@@ -383,14 +408,14 @@ const GuidedLearningBeta: React.FC<GuidedLearningBetaProps> = ({ initialFile, in
                     </div>
                 )}
 
-                {/* BARRE DE NAVIGATION (Bas de l'écran) */}
+                {/* --- BARRE DE NAVIGATION (FIXÉE AU BAS) --- */}
                 <div className="absolute bottom-6 left-0 right-0 px-4 z-50">
                    <div className="bg-white/95 backdrop-blur-xl border border-slate-200 p-3 rounded-2xl shadow-2xl flex items-center gap-3 max-w-lg mx-auto overflow-hidden">
                         
-                        {/* Mobile : Bouton Retour Sommaire | PC : Bouton Précédent */}
+                        {/* Mobile : Switcher Overview/Learning | PC : Précédent */}
                         {isMobile && mobilePhase === 'learning' ? (
-                            <button onClick={() => setMobilePhase('overview')} className="p-3 bg-slate-100 rounded-xl text-slate-500 active:bg-slate-200">
-                                <LayoutList size={20}/>
+                            <button onClick={() => setMobilePhase('overview')} className="p-3 bg-slate-100 rounded-xl text-slate-500 active:scale-95 transition-all">
+                                <RotateCcw size={20}/>
                             </button>
                         ) : (
                             <button onClick={() => goToTourStep(tourIndex - 1)} disabled={tourIndex === 0} className="p-3 bg-slate-100 rounded-xl disabled:opacity-30"><ChevronLeft size={20}/></button>
@@ -398,20 +423,23 @@ const GuidedLearningBeta: React.FC<GuidedLearningBetaProps> = ({ initialFile, in
                         
                         <div className="flex-1 flex flex-col items-center min-w-0">
                             <span className="text-[9px] font-black uppercase text-indigo-600 truncate w-full text-center tracking-widest">
-                                {tourIndex + 1} / {tourSequence.length} • {tourSequence[tourIndex]?.phase === 'plan' ? 'Survol' : 'Détails'}
+                                Étape {tourIndex + 1} / {tourSequence.length} • {tourSequence[tourIndex]?.phase === 'plan' ? 'Survol' : 'Détails'}
                             </span>
                             <span className="text-[12px] font-bold text-slate-800 truncate w-full text-center">
                                 {tourSequence[tourIndex]?.label}
                             </span>
                         </div>
 
-                        {/* Bouton Suivant | Reprendre */}
-                        {isMobile && mobilePhase === 'overview' && tourIndex > 0 ? (
+                        {/* Mobile Overview: Bouton Commencer / Reprendre */}
+                        {isMobile && mobilePhase === 'overview' ? (
                             <button 
-                                onClick={() => setMobilePhase('learning')}
-                                className="bg-emerald-600 text-white px-5 py-3 rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg active:scale-95"
+                                onClick={() => {
+                                    if(tourIndex > 0) setMobilePhase('learning');
+                                    else goToTourStep(1);
+                                }}
+                                className="bg-indigo-600 text-white px-5 py-3 rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg active:scale-95 transition-all"
                             >
-                                <RotateCcw size={16}/> Reprendre
+                                {tourIndex > 0 ? 'Reprendre' : 'Démarrer'} <ChevronRight size={16}/>
                             </button>
                         ) : (
                             <button 
@@ -435,13 +463,13 @@ const GuidedLearningBeta: React.FC<GuidedLearningBetaProps> = ({ initialFile, in
             </div>
         )}
 
-        {/* --- ATELIER / CHATBOT (FULL SCREEN OVERLAY SUR MOBILE) --- */}
+        {/* --- ATELIER IA / PDF (OVERLAY PLEIN ÉCRAN SUR MOBILE) --- */}
         <div className={`bg-white shadow-2xl z-[100] transition-all duration-300 ${isChatOpen ? 'fixed inset-0 md:relative md:w-[450px] md:border-l md:border-slate-200' : 'w-0 overflow-hidden'}`}>
             <div className="flex flex-col h-full">
-                {/* Header Atelier avec bouton de fermeture PRIORITAIRE sur mobile */}
+                {/* Header Atelier Mobile */}
                 <div className="flex bg-slate-50 border-b border-slate-100 shrink-0 items-center pr-2">
-                    <button onClick={() => setRightSideMode('ai')} className={`flex-1 py-4 text-xs font-bold border-b-2 ${rightSideMode === 'ai' ? 'text-indigo-600 border-indigo-600 bg-white' : 'text-slate-400 border-transparent'}`}>Assistant IA</button>
-                    <button onClick={() => setRightSideMode('pdf')} className={`flex-1 py-4 text-xs font-bold border-b-2 ${rightSideMode === 'pdf' ? 'text-indigo-600 border-indigo-600 bg-white' : 'text-slate-400 border-transparent'}`}>Source PDF</button>
+                    <button onClick={() => setRightSideMode('ai')} className={`flex-1 py-4 text-xs font-bold border-b-2 transition-all ${rightSideMode === 'ai' ? 'text-indigo-600 border-indigo-600 bg-white' : 'text-slate-400 border-transparent'}`}>Assistant IA</button>
+                    <button onClick={() => setRightSideMode('pdf')} className={`flex-1 py-4 text-xs font-bold border-b-2 transition-all ${rightSideMode === 'pdf' ? 'text-indigo-600 border-indigo-600 bg-white' : 'text-slate-400 border-transparent'}`}>Source PDF</button>
                     
                     {isMobile && (
                         <button 
@@ -456,19 +484,25 @@ const GuidedLearningBeta: React.FC<GuidedLearningBetaProps> = ({ initialFile, in
                 <div className="flex-1 overflow-hidden flex flex-col bg-slate-50/30 relative">
                     {rightSideMode === 'ai' ? (
                         <>
-                            <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-hide pb-20">
+                            <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-hide pb-24">
+                                {chatMessages.length === 0 && (
+                                    <div className="h-full flex flex-col items-center justify-center text-center opacity-30 p-10">
+                                        <Bot size={48} className="mb-4" />
+                                        <p className="text-sm font-medium">Posez une question sur le concept actuel pour débloquer de nouvelles explications.</p>
+                                    </div>
+                                )}
                                 {chatMessages.map((msg, idx) => (
                                     <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                        <div className={`max-w-[90%] p-3 rounded-xl text-sm ${msg.role === 'user' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white border border-slate-200 text-slate-800 shadow-sm'}`}>
+                                        <div className={`max-w-[90%] p-4 rounded-2xl text-sm ${msg.role === 'user' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white border border-slate-200 text-slate-800 shadow-sm'}`}>
                                             <ReactMarkdown>{msg.text}</ReactMarkdown>
                                         </div>
                                     </div>
                                 ))}
                                 {isLoadingChat && (
                                     <div className="flex justify-start">
-                                        <div className="bg-white border border-slate-200 p-3 rounded-xl shadow-sm flex items-center gap-2">
-                                            <Loader2 size={14} className="animate-spin text-indigo-600"/>
-                                            <span className="text-[10px] text-slate-400 font-bold uppercase">Réflexion...</span>
+                                        <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm flex items-center gap-2">
+                                            <Loader2 size={16} className="animate-spin text-indigo-600"/>
+                                            <span className="text-[10px] text-slate-400 font-black uppercase">Dr. Gemini réfléchit...</span>
                                         </div>
                                     </div>
                                 )}
@@ -476,17 +510,17 @@ const GuidedLearningBeta: React.FC<GuidedLearningBetaProps> = ({ initialFile, in
                             <div className="absolute bottom-0 inset-x-0 p-4 border-t border-slate-100 bg-white md:relative">
                                 <div className="relative flex gap-2">
                                     <input value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()} placeholder="Une question ?" className="flex-1 px-4 py-3 bg-slate-100 rounded-xl outline-none text-sm font-medium" />
-                                    <button onClick={() => handleSendMessage()} className="w-12 bg-indigo-600 text-white rounded-xl flex items-center justify-center"><Send size={18}/></button>
+                                    <button onClick={() => handleSendMessage()} className="w-12 bg-indigo-600 text-white rounded-xl flex items-center justify-center transition-transform active:scale-90"><Send size={18}/></button>
                                 </div>
                             </div>
                         </>
                     ) : (
                         <div className="flex-1 flex flex-col bg-slate-200">
                             <div className="p-3 bg-white border-b border-slate-200 flex items-center justify-between">
-                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Page {pdfPage} / {pdfTotalPages}</span>
+                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Aperçu Source • Page {pdfPage}</span>
                                 <div className="flex items-center gap-2">
-                                    <button onClick={() => setPdfPage(p => Math.max(1, p - 1))} className="p-1 bg-slate-50 rounded"><ChevronLeft size={20}/></button>
-                                    <button onClick={() => setPdfPage(p => Math.min(pdfTotalPages, p + 1))} className="p-1 bg-slate-50 rounded"><ChevronRight size={20}/></button>
+                                    <button onClick={() => setPdfPage(p => Math.max(1, p - 1))} className="p-2 bg-slate-50 rounded-lg"><ChevronLeft size={16}/></button>
+                                    <button onClick={() => setPdfPage(p => Math.min(pdfTotalPages, p + 1))} className="p-2 bg-slate-50 rounded-lg"><ChevronRight size={16}/></button>
                                 </div>
                             </div>
                             <div className="flex-1 overflow-auto p-4 bg-slate-300/50 flex justify-center">
@@ -502,6 +536,8 @@ const GuidedLearningBeta: React.FC<GuidedLearningBetaProps> = ({ initialFile, in
       <style>{`
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 2px; }
         @media (max-width: 768px) {
             .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
         }
@@ -510,6 +546,7 @@ const GuidedLearningBeta: React.FC<GuidedLearningBetaProps> = ({ initialFile, in
   );
 };
 
+// COMPOSANT MIND MAP TREE (DESKTOP)
 const MindMapTree: React.FC<{ 
     node: MindMapNode, 
     level?: number, 
